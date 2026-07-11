@@ -41,14 +41,21 @@ const P = {
 };
 
 const SKILL = {
-  bolt:    { key:"Z", cd: 0.22, dmg: [9, 13], speed: 820, range: 520, name: "불티" },
+  bolt:    { key:"Z", cd: 0.22, dmg: [9, 13], speed: 820, range: 520, name: "불티",
+             desc:"마나 없이 빠르게 연사하는 견습의 첫 화염탄." },
   fireball:{ key:"X", cdAfter: 0.55, mp: 15, minCharge: 0.15, maxCharge: 0.9,
-             dmg: [22, 30], dmgMaxMul: 2.4, speed: 640, name: "화염구" },
-  field:   { key:"C", cd: 6, mp: 20, dur: 4.0, tick: 0.35, dmg: [6, 9], width: 150, name: "화염 장판" },
-  lance:   { key:"V", cd: 1.1, mp: 12, dmg: [16, 22], speed: 1050, range: 720, name: "플레임 랜스" },
-  nova:    { key:"S", cd: 8, mp: 30, dmg: [28, 38], radius: 150, name: "폭염 노바" },
+             dmg: [22, 30], dmgMaxMul: 2.4, speed: 640, name: "화염구",
+             desc:"마력을 응축해 던지는 폭발 화염구. 차지할수록 강력해진다." },
+  field:   { key:"C", cd: 6, mp: 20, dur: 4.0, tick: 0.35, dmg: [6, 9], width: 150, name: "화염 장판",
+             desc:"지면에 화염진을 새겨 지속 피해를 주는 설치형 마법." },
+  lance:   { key:"V", cd: 1.1, mp: 12, dmg: [16, 22], speed: 1050, range: 720, name: "플레임 랜스",
+             desc:"일직선상의 적을 모두 꿰뚫는 고속 화염창." },
+  nova:    { key:"S", cd: 8, mp: 30, dmg: [28, 38], radius: 150, name: "폭염 노바",
+             desc:"자신을 중심으로 폭발하는 화염 파동. 짧은 무적과 함께 적을 밀쳐낸다." },
 };
 const CRIT_MUL = 1.5;
+const MAX_SKILL_LV = 5;
+const SKILL_ORDER = ["bolt","fireball","field","lance","nova"];
 
 // --- 스탯 랭크 시스템 (D- ~ SSS) : 기획서 §6.1
 const RANKS = ["D-","D","D+","C-","C","C+","B-","B","B+","A-","A","A+","S","SS","SSS"];
@@ -182,6 +189,7 @@ const MAPS = {
     npcs: [
       { kind: "club", name: "동아리 부장", x: 780, lines: [
         "여긴 마법 동아리 별관이야!", "친목·서브 퀘스트… 동아리 활동은 곧 열릴 거야. 기대해!" ] },
+      { kind: "trainer", name: "훈련 교관", x: 970 },
     ],
     mobs: [ ["dummy", 1100], ["dummy", 1190], ["dummy", 1280] ],
   },
@@ -417,6 +425,8 @@ const player = {
   level: 1, exp: 0,
   // ★ 스킬 제로 스타트 (§7.0): 모든 마법은 수업으로 습득
   skills: { bolt: false, fireball: false, field: false, lance: false, nova: false },
+  // 스킬 강화 레벨 (1~MAX_SKILL_LV) — 교관/수업으로 상승
+  skillLv: { bolt: 1, fireball: 1, field: 1, lance: 1, nova: 1 },
   stats: {
     str:{ r:1, tp:0, act:0 }, mag:{ r:1, tp:0, act:0 }, agi:{ r:1, tp:0, act:0 },
     vit:{ r:1, tp:0, act:0 }, wil:{ r:1, tp:0, act:0 },
@@ -587,6 +597,37 @@ function skillUsable(k){
   if(player.skills[k]) return true;
   return activeLessons().some(al => al.skill === k);   // 수업 중 임시 각인
 }
+
+// ============================== 스킬 강화 (레벨 1~5) ==============================
+function getSkillLv(k){ return clamp(player.skillLv[k] || 1, 1, MAX_SKILL_LV); }
+function skillLvMul(k){ return 1 + 0.25 * (getSkillLv(k) - 1); }          // 레벨당 데미지 +25%
+function skillTier(k){ const l = getSkillLv(k); return l >= 5 ? 2 : l >= 3 ? 1 : 0; }  // 이펙트 티어
+function skillDmgText(k, lv){
+  const l = lv ?? getSkillLv(k);
+  const mul = (1 + 0.25 * (l - 1)) * magMul();
+  const S = SKILL[k];
+  if(k === "fireball") return `${Math.floor(S.dmg[0]*mul)}~${Math.floor(S.dmg[1]*S.dmgMaxMul*mul)}`;
+  return `${Math.floor(S.dmg[0]*mul)}~${Math.floor(S.dmg[1]*mul)}`;
+}
+function upgradeSkill(k){
+  if(!player.skills[k]){
+    addFloatText(player.x, player.y - P.h - 40, "아직 배우지 않은 마법이다 — 수업부터!", "#f87171");
+    return;
+  }
+  if(getSkillLv(k) >= MAX_SKILL_LV){
+    addFloatText(player.x, player.y - P.h - 40, SKILL[k].name + "은(는) 이미 최대 레벨!", "#fbbf24");
+    return;
+  }
+  player.skillLv[k] = getSkillLv(k) + 1;
+  const lv = player.skillLv[k];
+  juice.addHitstop(0.1); juice.addShake(0.25); juice.flash = Math.max(juice.flash, 0.25);
+  const cols = lv >= 5 ? ["#7cc4ff","#bfe3ff","#fff"] : ["#ff9d4d","#ffd27f","#fff"];
+  spawnParticles(player.x, player.y - P.h/2, { n: 36, col: cols, sp0: 100, sp1: 400, l0: .4, l1: .9, add: true, grav: -80 });
+  questBanner(`스킬 강화!  — ${SKILL[k].name} Lv.${lv}${lv >= MAX_SKILL_LV ? " (MAX)" : ""}`,
+              `데미지 ${skillDmgText(k)} · 범위/이펙트 강화${lv >= 5 ? " · 푸른 화염 각성!" : ""}`,
+              "Tab → ←/→ : 스킬 도감에서 상세 확인");
+  saveGame();
+}
 function lessonEvent(task){
   // 동시에 여러 수업이 진행 중이어도 과제 종류가 맞는 수업에 카운트
   for(const al of activeLessons()){
@@ -612,6 +653,11 @@ function completeLesson(al){
 function teacherByRef(ref){ return TEACHERS.find(t => t.id === ref); }
 function talkNPC(n){
   if(n.kind === "teacher"){ talkToTeacher(teacherByRef(n.tref)); return; }
+  if(n.kind === "trainer"){
+    // 스킬 강화 패널 (편의상 무료 — 추후 수업/스토리 연동)
+    showTrainer = true;
+    return;
+  }
   if(n.kind === "heal"){
     player.hp = maxHp(); player.mp = maxMp();
     spawnParticles(player.x, player.y - 24, { n: 26, col: ["#8be9fd","#a3e635","#fff"], sp0: 40, sp1: 220, l0: .3, l1: .7, add: true, grav: -40 });
@@ -689,20 +735,27 @@ function talkToDoor(){
 const fields = [];
 function castField(){
   const pl = player;
+  const lv = getSkillLv("field"), tier = skillTier("field");
   pl.fieldCd = SKILL.field.cd;
   pl.mp -= SKILL.field.mp;
   pl.castT = 0.2;
   const fy = pl.onGround ? pl.y : GROUND_Y;
-  fields.push({ x: pl.x + pl.facing * 90, y: fy, t: 0, tickT: 0, w: SKILL.field.width });
+  fields.push({ x: pl.x + pl.facing * 90, y: fy, t: 0, tickT: 0,
+    w: SKILL.field.width + 26 * (lv - 1),           // 레벨당 폭 확장
+    dur: SKILL.field.dur + 0.4 * (lv - 1), tier });
   juice.addShake(0.1);
-  spawnParticles(pl.x + pl.facing*90, fy - 6, { n: 12, col: ["#ff7b3a","#ffd27f"], sp0: 40, sp1: 160, l0: .2, l1: .5, add: true, grav: -120 });
+  const cols = tier === 2 ? ["#7cc4ff","#bfe3ff"] : ["#ff7b3a","#ffd27f"];
+  spawnParticles(pl.x + pl.facing*90, fy - 6, { n: 12 + lv*2, col: cols, sp0: 40, sp1: 160, l0: .2, l1: .5, add: true, grav: -120 });
 }
 function updateFields(dt){
   for(let i=fields.length-1;i>=0;i--){
     const f = fields[i];
+    const fdur = f.dur ?? SKILL.field.dur;
     f.t += dt; f.tickT += dt;
-    if(Math.random() < 0.3)
-      spawnParticles(f.x + rand(-f.w/2, f.w/2), f.y - rand(0, 12), { n: 1, col: ["#ff7b3a","#ffb35c","#ffe08a"], sp0: 10, sp1: 60, l0: .2, l1: .5, add: true, grav: -160, r0: 2, r1: 4 });
+    if(Math.random() < 0.3 + (f.tier||0)*0.15)
+      spawnParticles(f.x + rand(-f.w/2, f.w/2), f.y - rand(0, 12),
+        { n: 1, col: f.tier === 2 ? ["#7cc4ff","#bfe3ff","#eaf6ff"] : ["#ff7b3a","#ffb35c","#ffe08a"],
+          sp0: 10, sp1: 60, l0: .2, l1: .5, add: true, grav: -160, r0: 2, r1: 4 });
     if(f.tickT >= SKILL.field.tick){
       f.tickT -= SKILL.field.tick;
       for(const m of monsters){
@@ -710,31 +763,34 @@ function updateFields(dt){
         const d = MOB_DEFS[m.type];
         if(Math.abs(m.y - f.y) > 60) continue;
         if(m.x + d.w/2 < f.x - f.w/2 || m.x - d.w/2 > f.x + f.w/2) continue;
-        hitMonster(m, Math.floor(irand(SKILL.field.dmg[0], SKILL.field.dmg[1]) * magMul()),
+        hitMonster(m, Math.floor(irand(SKILL.field.dmg[0], SKILL.field.dmg[1]) * magMul() * skillLvMul("field")),
                    20 * sign(m.x - f.x || 1), { type: "field", hitstop: 0.004, shake: 0.015 });
       }
     }
-    if(f.t >= SKILL.field.dur) fields.splice(i,1);
+    if(f.t >= fdur) fields.splice(i,1);
   }
 }
 
 // --- 폭염 노바 (중급: 자기 중심 광역)
 function castNova(){
   const pl = player;
+  const lv = getSkillLv("nova"), tier = skillTier("nova");
   pl.novaCd = SKILL.nova.cd;
   pl.mp -= SKILL.nova.mp;
   pl.castT = 0.25;
-  pl.iframes = Math.max(pl.iframes, 0.4);   // 탈출기: 짧은 무적
-  const cy = pl.y - 30, R = SKILL.nova.radius;
-  explosions.push({ x: pl.x, y: cy, r: R, t: 0, life: 0.3 });
-  juice.addShake(0.7); juice.addHitstop(0.1); juice.flash = Math.max(juice.flash, 0.25);
-  spawnParticles(pl.x, cy, { n: 40, col: ["#ff7b3a","#ffb35c","#ffe08a","#fff"], sp0: 150, sp1: 520, l0: .25, l1: .6, add: true });
+  pl.iframes = Math.max(pl.iframes, 0.4);
+  const cy = pl.y - 30, R = SKILL.nova.radius + 20 * (lv - 1);   // 레벨당 반경 확장
+  explosions.push({ x: pl.x, y: cy, r: R, t: 0, life: 0.3, col: tier === 2 ? "120,180,255" : "255,170,80" });
+  if(tier >= 1) explosions.push({ x: pl.x, y: cy, r: R * 0.6, t: 0, life: 0.42, col: tier === 2 ? "190,227,255" : "255,220,140" });
+  juice.addShake(0.7 + lv*0.05); juice.addHitstop(0.1); juice.flash = Math.max(juice.flash, 0.25);
+  const cols = tier === 2 ? ["#7cc4ff","#bfe3ff","#eaf6ff","#fff"] : ["#ff7b3a","#ffb35c","#ffe08a","#fff"];
+  spawnParticles(pl.x, cy, { n: 40 + lv*8, col: cols, sp0: 150, sp1: 520 + lv*40, l0: .25, l1: .6, add: true });
   for(const m of monsters){
     if(m.dead) continue;
     const r = mobRect(m);
     const cx = r.x + r.w/2, cy2 = r.y + r.h/2;
     if(Math.hypot(cx - pl.x, cy2 - cy) <= R + Math.max(r.w, r.h)/2){
-      hitMonster(m, Math.floor(irand(SKILL.nova.dmg[0], SKILL.nova.dmg[1]) * magMul()),
+      hitMonster(m, Math.floor(irand(SKILL.nova.dmg[0], SKILL.nova.dmg[1]) * magMul() * skillLvMul("nova")),
                  340 * sign(cx - pl.x || 1), { type: "nova", hitstop: 0.05, shake: 0.2 });
     }
   }
@@ -747,7 +803,7 @@ function saveGame(){
   try{
     localStorage.setItem(SAVE_KEY, JSON.stringify({
       v: 3, level: player.level, exp: player.exp, stats: player.stats,
-      skills: player.skills,
+      skills: player.skills, skillLv: player.skillLv,
       quest: { idx: questState.idx, prog: questState.prog, doneAll: questState.doneAll },
       teachers: Object.fromEntries(TEACHERS.map(t=>[t.id, teacherState[t.id]])),
       bossDefeated: boss.defeated,
@@ -763,6 +819,7 @@ function loadGame(){
     player.level = d.level; player.exp = d.exp;
     for(const k in player.stats) if(d.stats && d.stats[k]) player.stats[k] = d.stats[k];
     if(d.skills) Object.assign(player.skills, d.skills);
+    if(d.skillLv) Object.assign(player.skillLv, d.skillLv);
     if(d.quest) Object.assign(questState, d.quest);
     if(d.teachers) for(const id in teacherState) if(d.teachers[id]) Object.assign(teacherState[id], d.teachers[id]);
     if(d.bossDefeated) boss.defeated = true;
@@ -783,7 +840,7 @@ function updatePlayer(dt){
     return;
   }
 
-  const locked = dialog !== null || showBook || transition !== null;
+  const locked = dialog !== null || showBook || showTrainer || transition !== null;
 
   // --- 타이머
   pl.boltCd = Math.max(0, pl.boltCd - dt);
@@ -991,50 +1048,57 @@ const explosions = [];
 
 function fireBolt(){
   const pl = player;
-  const dmg = Math.floor(irand(SKILL.bolt.dmg[0], SKILL.bolt.dmg[1]) * magMul());
+  const dmg = Math.floor(irand(SKILL.bolt.dmg[0], SKILL.bolt.dmg[1]) * magMul() * skillLvMul("bolt"));
   pl.castT = 0.16;
+  const lv = getSkillLv("bolt"), tier = skillTier("bolt");
   projectiles.push({
     type: "bolt", x: pl.x + pl.facing*26, y: pl.y - 26,
-    vx: pl.facing * SKILL.bolt.speed, r: 6, dmg,
-    dist: 0, maxDist: SKILL.bolt.range, kb: 90,
-    hitstop: 0.025, shake: 0.06,
+    vx: pl.facing * (SKILL.bolt.speed + 30*(lv-1)), r: 6 + (lv-1), dmg,
+    dist: 0, maxDist: SKILL.bolt.range + 30*(lv-1), kb: 90 + 10*(lv-1),
+    hitstop: 0.025, shake: 0.06, tier,
   });
   pl.vx -= pl.facing * 20;
-  spawnParticles(pl.x + pl.facing*26, pl.y - 26, { n: 4, col: ["#ffb35c","#ffe08a"], ang: pl.facing>0?0:Math.PI, spread: .5, sp0: 60, sp1: 160, l0: .1, l1: .25, add: true });
+  const cols = tier === 2 ? ["#7cc4ff","#bfe3ff"] : ["#ffb35c","#ffe08a"];
+  spawnParticles(pl.x + pl.facing*26, pl.y - 26, { n: 4 + lv, col: cols, ang: pl.facing>0?0:Math.PI, spread: .5, sp0: 60, sp1: 160, l0: .1, l1: .25, add: true });
 }
 
 function fireFireball(t){
   const pl = player;
   const base = irand(SKILL.fireball.dmg[0], SKILL.fireball.dmg[1]);
-  const dmg = Math.floor(base * lerp(1, SKILL.fireball.dmgMaxMul, t) * magMul());
+  const dmg = Math.floor(base * lerp(1, SKILL.fireball.dmgMaxMul, t) * magMul() * skillLvMul("fireball"));
   pl.castT = 0.22;
+  const lv = getSkillLv("fireball"), tier = skillTier("fireball");
   projectiles.push({
     type: "fireball", x: pl.x + pl.facing*30, y: pl.y - 30,
-    vx: pl.facing * SKILL.fireball.speed, r: lerp(9, 18, t), dmg,
+    vx: pl.facing * SKILL.fireball.speed, r: lerp(9, 18, t) * (1 + 0.1*(lv-1)), dmg,
     dist: 0, maxDist: 640, kb: lerp(140, 320, t),
-    aoe: lerp(46, 110, t), charge: t,
-    hitstop: lerp(0.04, 0.11, t), shake: lerp(0.15, 0.5, t),
+    aoe: lerp(46, 110, t) * (1 + 0.13*(lv-1)),   // 레벨당 폭발 반경 확장
+    charge: t, tier,
+    hitstop: lerp(0.04, 0.11, t), shake: lerp(0.15, 0.5, t) * (1 + 0.08*(lv-1)),
   });
   pl.vx -= pl.facing * lerp(40, 160, t);
   juice.addShake(0.08 + t*0.1);
-  spawnParticles(pl.x + pl.facing*30, pl.y - 30, { n: 8 + Math.floor(t*8), col: ["#ff7b3a","#ffd27f"], ang: pl.facing>0?0:Math.PI, spread: .6, sp0: 80, sp1: 260, l0: .15, l1: .3, add: true });
+  const cols = tier === 2 ? ["#7cc4ff","#bfe3ff"] : ["#ff7b3a","#ffd27f"];
+  spawnParticles(pl.x + pl.facing*30, pl.y - 30, { n: 8 + Math.floor(t*8) + lv*2, col: cols, ang: pl.facing>0?0:Math.PI, spread: .6, sp0: 80, sp1: 260, l0: .15, l1: .3, add: true });
 }
 
 function fireLance(){
   const pl = player;
+  const lv = getSkillLv("lance"), tier = skillTier("lance");
   pl.mp -= SKILL.lance.mp;
   pl.castT = 0.2;
-  const dmg = Math.floor(irand(SKILL.lance.dmg[0], SKILL.lance.dmg[1]) * magMul());
+  const dmg = Math.floor(irand(SKILL.lance.dmg[0], SKILL.lance.dmg[1]) * magMul() * skillLvMul("lance"));
   projectiles.push({
     type: "lance", x: pl.x + pl.facing*30, y: pl.y - 28,
-    vx: pl.facing * SKILL.lance.speed, r: 10, dmg,
-    dist: 0, maxDist: SKILL.lance.range, kb: 200,
-    pierce: true, hitSet: new Set(),
+    vx: pl.facing * (SKILL.lance.speed + 40*(lv-1)), r: 10 + 1.5*(lv-1), dmg,
+    dist: 0, maxDist: SKILL.lance.range + 50*(lv-1), kb: 200 + 15*(lv-1),
+    pierce: true, hitSet: new Set(), tier,
     hitstop: 0.03, shake: 0.12,
   });
   pl.vx -= pl.facing * 60;
   juice.addShake(0.12);
-  spawnParticles(pl.x + pl.facing*34, pl.y - 28, { n: 10, col: ["#ff7b3a","#ffe08a"], ang: pl.facing>0?0:Math.PI, spread: .4, sp0: 120, sp1: 320, l0: .12, l1: .3, add: true });
+  const cols = tier === 2 ? ["#7cc4ff","#eaf6ff"] : ["#ff7b3a","#ffe08a"];
+  spawnParticles(pl.x + pl.facing*34, pl.y - 28, { n: 10 + lv*2, col: cols, ang: pl.facing>0?0:Math.PI, spread: .4, sp0: 120, sp1: 320, l0: .12, l1: .3, add: true });
 }
 
 function updateProjectiles(dt){
@@ -1043,7 +1107,8 @@ function updateProjectiles(dt){
     pr.x += pr.vx*dt;
     pr.dist += Math.abs(pr.vx)*dt;
     if(pr.type === "fireball" || pr.type === "lance" || Math.random() < 0.4){
-      spawnParticles(pr.x, pr.y, { n: 1, col: pr.type==="bolt"?["#ffd27f"]:["#ff7b3a","#ffb35c"], sp0: 5, sp1: 40, l0: .1, l1: .28, add: true, r0: 2, r1: pr.type==="bolt"?3:5 });
+      const trailCol = pr.tier === 2 ? ["#7cc4ff","#bfe3ff"] : pr.type==="bolt" ? ["#ffd27f"] : ["#ff7b3a","#ffb35c"];
+      spawnParticles(pr.x, pr.y, { n: 1, col: trailCol, sp0: 5, sp1: 40, l0: .1, l1: .28, add: true, r0: 2, r1: pr.type==="bolt"?3:5 });
     }
     if(pr.pierce){
       // 관통: 각 몬스터에 1회씩 타격, 사거리 끝까지 비행
@@ -1080,9 +1145,11 @@ function updateProjectiles(dt){
 
 function explodeFireball(pr){
   juice.addShake(pr.shake); juice.addHitstop(pr.hitstop);
-  spawnParticles(pr.x, pr.y, { n: 14 + Math.floor(pr.charge*18), col: ["#ff7b3a","#ffb35c","#ffe08a","#fff"], sp0: 100, sp1: 200 + pr.charge*260, l0: .2, l1: .5, add: true });
+  const cols = pr.tier === 2 ? ["#7cc4ff","#bfe3ff","#eaf6ff","#fff"] : ["#ff7b3a","#ffb35c","#ffe08a","#fff"];
+  spawnParticles(pr.x, pr.y, { n: 14 + Math.floor(pr.charge*18) + (pr.tier||0)*8, col: cols, sp0: 100, sp1: 200 + pr.charge*260, l0: .2, l1: .5, add: true });
   spawnParticles(pr.x, pr.y, { n: 6, col: "#4b5563", sp0: 30, sp1: 90, l0: .3, l1: .7, grav: -40, r0: 4, r1: 8 });
-  explosions.push({ x: pr.x, y: pr.y, r: pr.aoe, t: 0, life: 0.22 });
+  explosions.push({ x: pr.x, y: pr.y, r: pr.aoe, t: 0, life: 0.22, col: pr.tier === 2 ? "120,180,255" : "255,170,80" });
+  if(pr.tier >= 1) explosions.push({ x: pr.x, y: pr.y, r: pr.aoe * 0.55, t: 0, life: 0.32, col: pr.tier === 2 ? "190,227,255" : "255,220,140" });
   let hitAny = false;
   for(const m of monsters){
     if(m.dead) continue;
@@ -1335,10 +1402,23 @@ function updateEprojs(dt){
 }
 
 // ============================== UPDATE ==============================
-let showHelp = true, showBook = false;
+let showHelp = true, showBook = false, showTrainer = false, bookPage = 0;
 function update(dt){
-  if(inp.helpP()) showHelp = !showHelp;
-  if(inp.bookP()) showBook = !showBook;
+  if(showTrainer){
+    // 스킬 강화 패널: [1~5] 강화, E/Tab/Esc 닫기
+    if(pressed["e"] || pressed["Tab"] || pressed["Escape"]){
+      showTrainer = false;
+      pressed["e"] = pressed["Tab"] = pressed["Escape"] = false;   // 같은 프레임 재상호작용 방지
+    }else{
+      for(let i = 0; i < SKILL_ORDER.length; i++){
+        if(pressed[String(i+1)]) upgradeSkill(SKILL_ORDER[i]);
+      }
+    }
+  }else{
+    if(inp.helpP()) showHelp = !showHelp;
+    if(inp.bookP()){ showBook = !showBook; bookPage = 0; }
+    if(showBook && (pressed["ArrowLeft"] || pressed["ArrowRight"])) bookPage = 1 - bookPage;
+  }
 
   // --- 맵 전환
   if(transition){
@@ -1355,7 +1435,7 @@ function update(dt){
   // --- 대화 / 포탈 / 교사 상호작용
   if(dialog){
     if(pressed["e"] || pressed["z"] || pressed["space"]) advanceDialog();
-  }else if(!showBook && !transition && !player.dead){
+  }else if(!showBook && !showTrainer && !transition && !player.dead){
     let used = false;
     if(player.onGround && (pressed["ArrowUp"] || pressed["e"])){
       for(const p of portals){
@@ -1720,16 +1800,23 @@ function render(){
 
   // --- 화염 장판
   for(const f of fields){
+    const fdur = f.dur ?? SKILL.field.dur;
     const flick = 0.75 + Math.sin(f.t*30)*0.15;
-    const fade = f.t > SKILL.field.dur - 0.5 ? (SKILL.field.dur - f.t)/0.5 : 1;
+    const fade = f.t > fdur - 0.5 ? (fdur - f.t)/0.5 : 1;
+    const fh = 34 + (f.tier||0)*8;
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
     ctx.globalAlpha = 0.55 * flick * fade;
-    const fg = ctx.createLinearGradient(0, f.y - 34, 0, f.y);
-    fg.addColorStop(0, "rgba(255,140,40,0)");
-    fg.addColorStop(1, "#ff8c3a");
+    const fg = ctx.createLinearGradient(0, f.y - fh, 0, f.y);
+    if(f.tier === 2){
+      fg.addColorStop(0, "rgba(90,160,255,0)");
+      fg.addColorStop(1, "#5ab0ff");
+    }else{
+      fg.addColorStop(0, "rgba(255,140,40,0)");
+      fg.addColorStop(1, f.tier === 1 ? "#ffa54a" : "#ff8c3a");
+    }
     ctx.fillStyle = fg;
-    ctx.fillRect(f.x - f.w/2, f.y - 34, f.w, 34);
+    ctx.fillRect(f.x - f.w/2, f.y - fh, f.w, fh);
     ctx.restore();
   }
 
@@ -1838,26 +1925,32 @@ function render(){
   for(const pr of projectiles){
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
+    // 스킬 레벨 티어별 색: 0=주황, 1=밝은 금빛, 2(MAX)=푸른 화염
+    const tier = pr.tier || 0;
+    const core = tier === 2 ? "#eef7ff" : "#fff3d6";
+    const mid  = tier === 2 ? "#7cc4ff" : tier === 1 ? "#ffd27f" : "#ffb35c";
+    const edge = tier === 2 ? "rgba(80,140,255,0)" : "rgba(255,100,30,0)";
+    const glowMul = 2.2 + tier * 0.35;
     if(pr.type === "lance"){
       const g = ctx.createRadialGradient(pr.x, pr.y, 0, pr.x, pr.y, pr.r*3);
-      g.addColorStop(0, "#fff3d6");
-      g.addColorStop(0.4, "#ff9d4d");
-      g.addColorStop(1, "rgba(255,90,20,0)");
+      g.addColorStop(0, core);
+      g.addColorStop(0.4, tier === 2 ? "#5ab0ff" : "#ff9d4d");
+      g.addColorStop(1, edge);
       ctx.fillStyle = g;
       ctx.beginPath();
-      ctx.ellipse(pr.x, pr.y, pr.r*3.4, pr.r*1.3, 0, 0, Math.PI*2);
+      ctx.ellipse(pr.x, pr.y, pr.r*(3.4 + tier*0.4), pr.r*1.3, 0, 0, Math.PI*2);
       ctx.fill();
-      ctx.fillStyle = "#fff0c0";
+      ctx.fillStyle = tier === 2 ? "#dceeff" : "#fff0c0";
       ctx.beginPath();
       ctx.ellipse(pr.x + sign(pr.vx)*pr.r*1.6, pr.y, pr.r*1.4, pr.r*0.6, 0, 0, Math.PI*2);
       ctx.fill();
     }else{
-      const g = ctx.createRadialGradient(pr.x, pr.y, 0, pr.x, pr.y, pr.r*2.2);
-      g.addColorStop(0, "#fff3d6");
-      g.addColorStop(0.4, "#ffb35c");
-      g.addColorStop(1, "rgba(255,100,30,0)");
+      const g = ctx.createRadialGradient(pr.x, pr.y, 0, pr.x, pr.y, pr.r*glowMul);
+      g.addColorStop(0, core);
+      g.addColorStop(0.4, mid);
+      g.addColorStop(1, edge);
       ctx.fillStyle = g;
-      ctx.beginPath(); ctx.arc(pr.x, pr.y, pr.r*2.2, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(pr.x, pr.y, pr.r*glowMul, 0, Math.PI*2); ctx.fill();
     }
     ctx.restore();
   }
@@ -1867,7 +1960,7 @@ function render(){
     const k = e.t / e.life;
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
-    ctx.strokeStyle = `rgba(255,170,80,${1-k})`;
+    ctx.strokeStyle = `rgba(${e.col || "255,170,80"},${1-k})`;
     ctx.lineWidth = 6 * (1-k) + 2;
     ctx.beginPath(); ctx.arc(e.x, e.y, e.r * (0.4 + k*0.6), 0, Math.PI*2); ctx.stroke();
     ctx.restore();
@@ -2196,6 +2289,7 @@ function drawNPC(n){
     heal: { robe:"#3f7a6e", robeD:"#2c5850", em:"#8be9fd", mark:"+" },
     shop: { robe:"#9a6b2e", robeD:"#734f20", em:"#fbbf24", mark:"$" },
     club: { robe:"#4a7a4a", robeD:"#356035", em:"#a3e635", mark:"♪" },
+    trainer: { robe:"#7a2e2e", robeD:"#5a1f1f", em:"#ff9d4d", mark:"↑" },
     info: { robe:"#4a4f7a", robeD:"#353a5e", em:"#c4b5fd", mark:"!" },
   }[n.kind] || { robe:"#4a4f7a", robeD:"#353a5e", em:"#c4b5fd", mark:"!" };
   // 몸
@@ -2576,6 +2670,7 @@ function renderHUD(){
   }
 
   if(showBook) renderBook();
+  if(showTrainer) renderTrainer();
 
   // 대화창
   if(dialog){
@@ -2630,12 +2725,20 @@ function renderBook(){
   ctx.textAlign = "left";
   ctx.font = "bold 20px sans-serif"; ctx.fillStyle = "#8be9fd";
   ctx.fillText("학생 수첩", px2 + 28, py + 40);
-  ctx.font = "13px sans-serif"; ctx.fillStyle = "#64748b";
-  ctx.fillText("아르카나 아카데미 1학년 — 화염술 예과 (Tab: 닫기)", px2 + 130, py + 40);
+  // 페이지 탭
+  ctx.font = "bold 13px sans-serif";
+  ctx.fillStyle = bookPage === 0 ? "#fbbf24" : "#64748b";
+  ctx.fillText("① 학생부", px2 + 150, py + 40);
+  ctx.fillStyle = bookPage === 1 ? "#fbbf24" : "#64748b";
+  ctx.fillText("② 스킬 도감", px2 + 236, py + 40);
+  ctx.font = "12px sans-serif"; ctx.fillStyle = "#64748b";
+  ctx.fillText("←/→ 페이지 · Tab 닫기", px2 + 350, py + 40);
   const ov = overallRank();
   ctx.textAlign = "right";
   ctx.font = "bold 17px sans-serif"; ctx.fillStyle = rankColor(ov);
   ctx.fillText(`종합 랭크  ${ov}`, px2 + PW - 28, py + 40);
+
+  if(bookPage === 1){ renderCodex(px2, py, PW, PH); ctx.restore(); return; }
 
   // 좌: 스탯 랭크
   ctx.textAlign = "left";
@@ -2708,6 +2811,137 @@ function renderBook(){
     ctx.fillStyle = state === "locked" ? "#334155" : "#84cc16";
     const rw = q.rewards.map(([k,s])=>`${STAT_DEFS[k].name}[${s}]`).join(" ") + `  EXP ${q.exp}`;
     ctx.fillText("보상: " + rw, qx + 12, ry + 40);
+  });
+  ctx.restore();
+}
+
+// 스킬 아이콘 색 (핫바와 통일)
+const SKILL_ICON_COL = { bolt:"#ffb35c", fireball:"#ff6b3a", field:"#ff8c3a", lance:"#ffd23e", nova:"#ff5040" };
+
+// 스킬별 상세 스탯 텍스트 (현재 레벨 기준)
+function skillStatText(k){
+  const lv = getSkillLv(k), d = skillDmgText(k);
+  if(k === "bolt")     return `데미지 ${d} · MP 0 · 쿨 0.22s · 사거리 ${520 + 30*(lv-1)}`;
+  if(k === "fireball") return `데미지 ${d} (풀차지) · MP 15 · 폭발반경 ~${Math.round(110 * (1 + 0.13*(lv-1)))}`;
+  if(k === "field")    return `틱당 ${d} · MP 20 · 지속 ${(4 + 0.4*(lv-1)).toFixed(1)}s · 폭 ${150 + 26*(lv-1)}`;
+  if(k === "lance")    return `데미지 ${d} · 관통 · MP 12 · 사거리 ${720 + 50*(lv-1)}`;
+  return `데미지 ${d} · MP 30 · 반경 ${150 + 20*(lv-1)} · 시전 무적 0.4s`;
+}
+
+function drawLvPips(x, y, lv, col){
+  for(let i = 0; i < MAX_SKILL_LV; i++){
+    ctx.fillStyle = i < lv ? col : "rgba(100,116,139,.35)";
+    const cx = x + i * 15;
+    ctx.beginPath();
+    ctx.moveTo(cx, y - 6); ctx.lineTo(cx + 6, y); ctx.lineTo(cx, y + 6); ctx.lineTo(cx - 6, y);
+    ctx.closePath(); ctx.fill();
+  }
+}
+
+// ============================== 스킬 도감 (학생 수첩 2페이지) ==============================
+function renderCodex(px2, py, PW, PH){
+  ctx.textAlign = "left";
+  ctx.font = "bold 15px sans-serif"; ctx.fillStyle = "#e2e8f0";
+  ctx.fillText("화염술 스킬 도감", px2 + 28, py + 74);
+  ctx.font = "11px sans-serif"; ctx.fillStyle = "#64748b";
+  ctx.fillText("스킬 강화: 교정 훈련장의 훈련 교관 (E)", px2 + PW - 290, py + 74);
+
+  SKILL_ORDER.forEach((k, i)=>{
+    const S = SKILL[k];
+    const learned = player.skills[k];
+    const lv = getSkillLv(k), tier = skillTier(k);
+    const ry = py + 96 + i * 72;
+    // 행 배경
+    ctx.fillStyle = learned ? "rgba(255,180,80,.05)" : "rgba(0,0,0,.25)";
+    roundRect(px2 + 24, ry - 8, PW - 48, 64, 8); ctx.fill();
+    if(learned && tier === 2){
+      ctx.strokeStyle = "rgba(124,196,255,.5)"; ctx.lineWidth = 1.5;
+      roundRect(px2 + 24, ry - 8, PW - 48, 64, 8); ctx.stroke();
+    }
+    // 아이콘
+    ctx.fillStyle = learned ? (tier === 2 ? "#7cc4ff" : SKILL_ICON_COL[k]) : "#3a4155";
+    ctx.beginPath(); ctx.arc(px2 + 52, ry + 22, 15, 0, Math.PI*2); ctx.fill();
+    ctx.textAlign = "center";
+    ctx.font = "bold 11px sans-serif"; ctx.fillStyle = "#0b0d17";
+    ctx.fillText(S.key, px2 + 52, ry + 26);
+    ctx.textAlign = "left";
+    // 이름 + 레벨
+    ctx.font = "bold 15px sans-serif";
+    ctx.fillStyle = learned ? "#e2e8f0" : "#64748b";
+    ctx.fillText(S.name, px2 + 82, ry + 10);
+    ctx.font = "bold 12px sans-serif";
+    if(learned){
+      ctx.fillStyle = lv >= MAX_SKILL_LV ? "#7cc4ff" : "#fbbf24";
+      ctx.fillText(lv >= MAX_SKILL_LV ? `Lv.${lv} MAX` : `Lv.${lv}`, px2 + 82 + ctx.measureText(S.name).width + 26, ry + 10);
+    }else{
+      ctx.fillStyle = "#64748b";
+      ctx.fillText("미습득 — 수업에서 배우자", px2 + 82 + 90, ry + 10);
+    }
+    // 설명 / 스탯
+    ctx.font = "11px sans-serif"; ctx.fillStyle = learned ? "#94a3b8" : "#4a5568";
+    ctx.fillText(S.desc, px2 + 82, ry + 28);
+    ctx.fillStyle = learned ? "#fbbf24" : "#4a5568";
+    ctx.fillText(learned ? skillStatText(k) : "수업 이수 후 정보가 공개됩니다.", px2 + 82, ry + 46);
+    // 우측: 레벨 핍 + 다음 레벨
+    drawLvPips(px2 + PW - 180, ry + 8, learned ? lv : 0, tier === 2 ? "#7cc4ff" : "#fbbf24");
+    ctx.font = "10px sans-serif"; ctx.fillStyle = "#64748b";
+    if(learned){
+      ctx.fillText(lv >= MAX_SKILL_LV ? "푸른 화염 각성 완료" : "다음 Lv: +25% · 범위↑", px2 + PW - 186, ry + 30);
+    }
+  });
+}
+
+// ============================== 스킬 강화 패널 (훈련 교관) ==============================
+function renderTrainer(){
+  const PW = 740, PH = 470;
+  const px2 = (VIEW_W - PW)/2, py = (VIEW_H - PH)/2;
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,.55)";
+  ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+  ctx.fillStyle = "rgba(20,14,14,.96)";
+  roundRect(px2, py, PW, PH, 14); ctx.fill();
+  ctx.strokeStyle = "#7a2e2e"; ctx.lineWidth = 2;
+  roundRect(px2, py, PW, PH, 14); ctx.stroke();
+
+  ctx.textAlign = "left";
+  ctx.font = "bold 20px sans-serif"; ctx.fillStyle = "#ff9d4d";
+  ctx.fillText("훈련 교관 — 스킬 강화", px2 + 28, py + 40);
+  ctx.font = "12px sans-serif"; ctx.fillStyle = "#94a3b8";
+  ctx.fillText("숫자 [1~5] 키로 강화  ·  E/Tab 닫기   ※ 지금은 무료 — 추후 수업·스토리 연동", px2 + 28, py + 62);
+
+  SKILL_ORDER.forEach((k, i)=>{
+    const S = SKILL[k];
+    const learned = player.skills[k];
+    const lv = getSkillLv(k), tier = skillTier(k);
+    const maxed = lv >= MAX_SKILL_LV;
+    const ry = py + 88 + i * 72;
+    ctx.fillStyle = learned && !maxed ? "rgba(255,157,77,.08)" : "rgba(0,0,0,.25)";
+    roundRect(px2 + 24, ry - 6, PW - 48, 62, 8); ctx.fill();
+    // 번호 키
+    ctx.fillStyle = learned && !maxed ? "#ff9d4d" : "#3a4155";
+    roundRect(px2 + 36, ry + 6, 34, 34, 6); ctx.fill();
+    ctx.textAlign = "center";
+    ctx.font = "bold 17px sans-serif"; ctx.fillStyle = "#0b0d17";
+    ctx.fillText(String(i+1), px2 + 53, ry + 29);
+    ctx.textAlign = "left";
+    // 이름 + 핍
+    ctx.font = "bold 15px sans-serif"; ctx.fillStyle = learned ? "#e2e8f0" : "#64748b";
+    ctx.fillText(`${S.name} (${S.key})`, px2 + 86, ry + 16);
+    drawLvPips(px2 + 92, ry + 36, learned ? lv : 0, tier === 2 ? "#7cc4ff" : "#fbbf24");
+    // 데미지 변화
+    ctx.font = "12px sans-serif";
+    if(!learned){
+      ctx.fillStyle = "#64748b";
+      ctx.fillText("미습득 — 교수님 수업에서 먼저 배우세요", px2 + 300, ry + 24);
+    }else if(maxed){
+      ctx.fillStyle = "#7cc4ff";
+      ctx.fillText(`MAX  ·  데미지 ${skillDmgText(k)}  ·  푸른 화염`, px2 + 300, ry + 24);
+    }else{
+      ctx.fillStyle = "#cbd5e1";
+      ctx.fillText(`데미지 ${skillDmgText(k)}`, px2 + 300, ry + 16);
+      ctx.fillStyle = "#a3e635";
+      ctx.fillText(`→ Lv.${lv+1}: ${skillDmgText(k, lv+1)}  (+범위/이펙트)`, px2 + 300, ry + 36);
+    }
   });
   ctx.restore();
 }
