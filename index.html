@@ -29,6 +29,7 @@ const GROUND_Y = 640;
 const DT = 1 / 120;
 const GRAV = 2600;
 const GATE_X = 3620, ARENA_L = 3660, ARENA_R = 4360;   // 숲: 학기말 실기 시험장
+const STAIR_SNAP = 18;   // 계단(대각선 발판) 흡착 허용치
 
 const P = {
   w: 30, h: 46,
@@ -156,28 +157,85 @@ const combo = { count: 0, timer: 0, best: 0,
   update(dt){ if(this.timer > 0){ this.timer -= dt; if(this.timer <= 0) this.count = 0; } },
 };
 
-// ============================== 맵 데이터 (§3.4) ==============================
+// ============================== 맵 데이터 (§3.4 / §3.5) ==============================
+// 학교 본관은 tall:true (세로 스크롤 다층 + 계단), 그 외는 평면 맵(포탈/문 연결)
 const MAPS = {
   campus: {
-    name: "아르카나 아카데미 — 캠퍼스", w: 2900, theme: "campus",
+    name: "아르카나 아카데미 — 교정", w: 2760, theme: "campus",
     platforms: [
-      { x: 820,  y: 532, w: 150, h: 14 },
-      { x: 1290, y: 532, w: 150, h: 14 },
-      { x: 2360, y: 540, w: 160, h: 14 },
+      { x: 900,  y: 532, w: 150, h: 14 },
+      { x: 1500, y: 500, w: 150, h: 14 },
     ],
     signs: [
       { x: 250,  text: "← → 이동  /  Space 점프  /  Shift 대시" },
-      { x: 520,  text: "강의동: 교수님께 E — 마법은 배워야 쓸 수 있다!" },
-      { x: 1600, text: "지하 계단: ↑ 로 내려간다… 왠지 으스스하다" },
-      { x: 1950, text: "훈련장 — 배운 마법을 허수아비에 시험!" },
-      { x: 2700, text: "관문: ↑ 를 눌러 입문의 숲으로" },
+      { x: 420,  text: "본관: ↑ 로 들어가 계단을 올라 교실로!" },
+      { x: 780,  text: "동아리 별관" },
+      { x: 1180, text: "훈련장 — 배운 마법을 허수아비에!" },
+      { x: 1760, text: "마을 가는 길: ↑" },
+      { x: 2450, text: "관문: ↑ 입문의 숲" },
     ],
     portals: [
-      { x: 2820, to: "forest", tx: 180, ty: 640, label: "입문의 숲" },
-      { x: 1750, to: "basement", tx: 150, ty: 210, label: "지하실 (수상한 계단)", tint: "#4ade80", down: true },
+      { x: 420,  y: 640, to: "school",  tx: 150, ty: 1240, label: "본관", door: true, tint: "#ffd27f" },
+      { x: 1760, y: 640, to: "road1",   tx: 150, ty: 640,  label: "마을 가는 길", tint: "#8be9fd" },
+      { x: 2500, y: 640, to: "forest",  tx: 180, ty: 640,  label: "입문의 숲" },
     ],
-    mobs: [ ["dummy", 2000], ["dummy", 2090], ["dummy", 2180] ],
+    npcs: [
+      { kind: "club", name: "동아리 부장", x: 780, lines: [
+        "여긴 마법 동아리 별관이야!", "친목·서브 퀘스트… 동아리 활동은 곧 열릴 거야. 기대해!" ] },
+    ],
+    mobs: [ ["dummy", 1100], ["dummy", 1190], ["dummy", 1280] ],
   },
+
+  school: {
+    name: "아르카나 아카데미 — 본관", w: 1720, h: 1300, tall: true, theme: "school",
+    platforms: [
+      { x: 0,   y: 1240, w: 1720, h: 60, solidGround: true },   // 1F (전폭)
+      { x: 0,   y: 830,  w: 1250, h: 22, solidGround: true },   // 2F (0~1250, 우측 끝이 계단A 상단)
+      { x: 470, y: 420,  w: 1130, h: 22, solidGround: true },   // 3F (470~1600, 좌측이 계단B 상단)
+    ],
+    // 계단(대각선 발판): 상단=위층 가장자리, 하단=아래층. 계단 위를 위층 바닥이 덮지 않음.
+    stairs: [
+      { x0: 1250, y0: 819, x1: 1650, y1: 1240 },   // 1F ↔ 2F (상단이 2F보다 살짝 높음 → 자연 착지)
+      { x0: 470,  y0: 409, x1: 120,  y1: 830 },    // 2F ↔ 3F
+    ],
+    signs: [
+      { x: 660,  y: 1240, text: "매점" },
+      { x: 900,  y: 1240, text: "양호실" },
+      { x: 1120, y: 1240, text: "지하 계단 ↓" },
+      { x: 1600, y: 1240, text: "2층 계단 ↑ →" },
+      { x: 1150, y: 830,  text: "초급 강의실" },
+      { x: 700,  y: 830,  text: "중급 강의실" },
+      { x: 400,  y: 830,  text: "도서관" },
+      { x: 150,  y: 830,  text: "← 3층 계단 ↑" },
+      { x: 640,  y: 420,  text: "교장실" },
+      { x: 1100, y: 420,  text: "고급 강의실" },
+    ],
+    portals: [
+      { x: 140,  y: 1240, to: "campus",   tx: 460, ty: 640,  label: "밖으로", door: true },
+      { x: 1120, y: 1240, to: "basement", tx: 150, ty: 210,  label: "지하실", tint: "#4ade80", down: true },
+    ],
+    npcs: [
+      { kind: "info", name: "안내 데스크", x: 380, y: 1240, lines: [
+        "아르카나 아카데미에 온 걸 환영해요!",
+        "계단을 올라 2층 강의실에서 마법을 배울 수 있어요. 3층엔 교장실과 고급 강의실이 있죠.",
+        "우측 계단으로 2층에 올라가 보세요!" ] },
+      { kind: "shop", name: "매점 상인", x: 660, y: 1240, lines: [
+        "매점입니다. 포션·간식·마도서 스크롤…", "상점 기능은 준비 중이에요. 조금만 기다려 주세요!" ] },
+      { kind: "heal", name: "양호 선생님", x: 900, y: 1240, lines: [
+        "다쳤군요? 이리 와요. 금방 낫게 해줄게요." ] },
+      { kind: "teacher", tref: "agnis", x: 1150, y: 830 },
+      { kind: "teacher", tref: "ignia", x: 700, y: 830 },
+      { kind: "info", name: "사서", x: 400, y: 830, lines: [
+        "도서관입니다. 스킬·몬스터 도감과 연구는 준비 중이에요.", "…쉿, 조용히 해주세요." ] },
+      { kind: "info", name: "교장", x: 640, y: 420, lines: [
+        "나는 이 학교의 교장일세.",
+        "학기말 실기 시험을 통과하면 중급 과정이 열리지. 정진하게.",
+        "언젠가… 지하실의 그 문에 대해서도 이야기할 날이 오겠군." ] },
+      { kind: "teacher", tref: "master", x: 1100, y: 420 },
+    ],
+    mobs: [],
+  },
+
   forest: {
     name: "입문의 숲", w: 4400, theme: "forest",
     platforms: [
@@ -193,9 +251,9 @@ const MAPS = {
       { x: 340,  text: "입문의 숲 — 몬스터 주의!" },
       { x: 1700, text: "X 누르고 있기: 화염구 차지 → 놓으면 발사!" },
       { x: 3460, text: "전방: 학기말 실기 시험장!" },
-      { x: 4340, text: "1학기 수료! — 다음 업데이트에서 계속" },
+      { x: 4340, text: "1학기 수료!" },
     ],
-    portals: [ { x: 110, to: "campus", tx: 2740, ty: 640, label: "캠퍼스" } ],
+    portals: [ { x: 110, to: "campus", tx: 2500, ty: 640, label: "교정" } ],
     mobs: [
       ["slime", 1560, 1500, 1720], ["slime", 1840, 1760, 1980],
       ["slime", 2120, 2020, 2260], ["slime", 2320, 2240, 2440],
@@ -203,33 +261,30 @@ const MAPS = {
       ["mushroom", 3080, 3000, 3220],
     ],
   },
+
   basement: {
     name: "학교 지하실", w: 3400, theme: "basement",
-    // 긴 계단(입구 착지대 → 우하향) + 층층이 갈라지는 미로형 발판
     platforms: [
-      { x: 20,   y: 210, w: 360, h: 14 },   // 입구 착지대(상단)
-      { x: 380,  y: 275, w: 130, h: 14 },   // 계단
+      { x: 20,   y: 210, w: 360, h: 14 },
+      { x: 380,  y: 275, w: 130, h: 14 },
       { x: 510,  y: 340, w: 130, h: 14 },
       { x: 640,  y: 405, w: 130, h: 14 },
       { x: 770,  y: 470, w: 130, h: 14 },
       { x: 900,  y: 535, w: 130, h: 14 },
-      // 미로 구간
       { x: 1150, y: 520, w: 160, h: 14 },
-      { x: 1380, y: 440, w: 150, h: 14 },   // 위 분기
+      { x: 1380, y: 440, w: 150, h: 14 },
       { x: 1610, y: 360, w: 150, h: 14 },
-      { x: 1560, y: 560, w: 210, h: 14 },   // 아래 분기
+      { x: 1560, y: 560, w: 210, h: 14 },
       { x: 1900, y: 470, w: 160, h: 14 },
       { x: 2150, y: 380, w: 150, h: 14 },
       { x: 2130, y: 585, w: 190, h: 14 },
-      { x: 2400, y: 300, w: 150, h: 14 },   // 높은 막다른 곳
+      { x: 2400, y: 300, w: 150, h: 14 },
       { x: 2440, y: 500, w: 170, h: 14 },
       { x: 2700, y: 420, w: 160, h: 14 },
       { x: 2950, y: 520, w: 180, h: 14 },
     ],
-    signs: [
-      { x: 200, text: "학교 지하실 — 관계자 외 출입 금지" },
-    ],
-    portals: [ { x: 90, to: "campus", tx: 1750, ty: 640, label: "↑ 캠퍼스로", tint: "#8b5cf6" } ],
+    signs: [ { x: 200, text: "학교 지하실 — 관계자 외 출입 금지" } ],
+    portals: [ { x: 90, y: 210, to: "school", tx: 1120, ty: 1240, label: "↑ 본관으로", tint: "#8b5cf6" } ],
     torches: [ 200, 640, 1150, 1650, 2150, 2650, 3080 ],
     door: { x: 3230 },
     mobs: [
@@ -239,11 +294,73 @@ const MAPS = {
       ["bat", 3060, 2900, 3200, 290],
     ],
   },
+
+  road1: {
+    name: "학교 뒷숲 — 마을 가는 길", w: 2400, theme: "forest",
+    platforms: [
+      { x: 700, y: 520, w: 160, h: 14 },
+      { x: 1150, y: 470, w: 160, h: 14 },
+      { x: 1600, y: 520, w: 160, h: 14 },
+    ],
+    signs: [
+      { x: 300,  text: "학교 뒷숲 — 마을 가는 길" },
+      { x: 2150, text: "여명 마을 성문이 보인다" },
+    ],
+    portals: [
+      { x: 110,  y: 640, to: "campus",  tx: 1760, ty: 640, label: "교정" },
+      { x: 2300, y: 640, to: "village", tx: 150,  ty: 640, label: "여명 마을" },
+    ],
+    mobs: [
+      ["slime", 900, 800, 1050], ["slime", 1300, 1200, 1450],
+      ["mushroom", 1750, 1650, 1900],
+    ],
+  },
+
+  village: {
+    name: "여명 마을", w: 2600, theme: "town",
+    platforms: [ { x: 1250, y: 520, w: 160, h: 14 } ],
+    signs: [
+      { x: 300,  text: "여명 마을 — 학교 앞 작은 마을" },
+      { x: 700,  text: "여관" },
+      { x: 1100, text: "잡화점" },
+      { x: 1500, text: "마을 게시판" },
+    ],
+    portals: [
+      { x: 110,  y: 640, to: "road1",  tx: 2300, ty: 640, label: "마을 가는 길" },
+      { x: 2450, y: 640, to: "harbor", tx: 150,  ty: 640, label: "소금바람 항구", door: true, tint: "#7dd3fc" },
+    ],
+    npcs: [
+      { kind: "heal", name: "여관 주인", x: 700, lines: [
+        "여명 여관입니다. 푹 쉬고 가세요 — 체력과 마나를 회복해 드릴게요." ] },
+      { kind: "shop", name: "잡화 상인", x: 1100, lines: [
+        "여명 잡화점입니다! …상점 기능은 준비 중이에요.", "곧 좋은 물건 들여올게요." ] },
+      { kind: "info", name: "마을 주민", x: 1500, lines: [
+        "항구 쪽으로 가면 바다를 볼 수 있어요.", "언젠가 저 배로 먼 대륙에도 갈 수 있다던데…" ] },
+    ],
+    mobs: [],
+  },
+
+  harbor: {
+    name: "소금바람 항구", w: 2200, theme: "harbor",
+    platforms: [ { x: 900, y: 520, w: 200, h: 14 } ],
+    signs: [
+      { x: 300,  text: "소금바람 항구" },
+      { x: 1850, text: "출항 준비 중…" },
+    ],
+    portals: [ { x: 110, y: 640, to: "village", tx: 2450, ty: 640, label: "여명 마을" } ],
+    npcs: [
+      { kind: "info", name: "선원", x: 900, lines: [
+        "여어, 학생! 여긴 소금바람 항구야.",
+        "저 배로 다른 지역에 갈 수 있지만… 아직 출항 준비 중이라네.",
+        "다음에 다시 오게. 바다 건너엔 볼거리가 많거든!" ] },
+    ],
+    mobs: [],
+  },
 };
 
 let curMapId = "campus";
-let mapW = MAPS.campus.w, mapTheme = "campus";
-let platforms = [], signs = [], portals = [];
+let mapW = MAPS.campus.w, mapH = VIEW_H, mapTheme = "campus", mapTall = false;
+let platforms = [], stairs = [], signs = [], portals = [], npcs = [];
 let mapTorches = [], mapDoor = null;
 let doorTalks = 0;
 
@@ -262,15 +379,18 @@ function startTransition(to, tx, ty){
 function loadMap(id, spawnX, spawnY){
   const M = MAPS[id];
   curMapId = id;
-  mapW = M.w; mapTheme = M.theme;
-  platforms = [{ x: 0, y: GROUND_Y, w: M.w, h: 80, solidGround: true }, ...M.platforms];
-  signs = M.signs; portals = M.portals;
+  mapW = M.w; mapH = M.h || VIEW_H; mapTheme = M.theme; mapTall = !!M.tall;
+  // 평면 맵은 바닥 자동 추가, 다층(tall) 맵은 자체 층(solidGround) 사용
+  platforms = M.tall ? [...M.platforms] : [{ x: 0, y: GROUND_Y, w: M.w, h: 80, solidGround: true }, ...M.platforms];
+  stairs = M.stairs || [];
+  signs = M.signs || []; portals = M.portals || [];
+  npcs = (M.npcs || []).map(n => ({ ...n, y: n.y ?? GROUND_Y }));
   mapTorches = M.torches || [];
   mapDoor = M.door || null;
   // 몬스터 리스폰 (일회성 보스 제외)
   monsters.length = 0;
   BOSS_M = null;
-  for(const md of M.mobs) spawnMob(md[0], md[1], md[2], md[3], md[4]);
+  for(const md of (M.mobs || [])) spawnMob(md[0], md[1], md[2], md[3], md[4]);
   if(id === "forest"){
     spawnMob("boss", 4100, 4100, 4100);
     BOSS_M = monsters[monsters.length - 1];
@@ -283,7 +403,8 @@ function loadMap(id, spawnX, spawnY){
   player.x = clamp(spawnX, P.w/2, mapW - P.w/2);
   player.y = spawnY ?? GROUND_Y; player.vx = 0; player.vy = 0;
   camX = clamp(player.x - VIEW_W/2, 0, Math.max(0, mapW - VIEW_W));
-  addFloatText(player.x, GROUND_Y - 130, M.name, "#8be9fd");
+  camY = clamp(player.y - VIEW_H*0.62, 0, Math.max(0, mapH - VIEW_H));
+  addFloatText(player.x, player.y - 130, M.name, "#8be9fd");
 }
 
 // ============================== PLAYER ==============================
@@ -487,6 +608,22 @@ function completeLesson(al){
   saveGame();
 }
 
+// 범용 NPC 상호작용 (교사·양호·매점·안내·주민 등)
+function teacherByRef(ref){ return TEACHERS.find(t => t.id === ref); }
+function talkNPC(n){
+  if(n.kind === "teacher"){ talkToTeacher(teacherByRef(n.tref)); return; }
+  if(n.kind === "heal"){
+    player.hp = maxHp(); player.mp = maxMp();
+    spawnParticles(player.x, player.y - 24, { n: 26, col: ["#8be9fd","#a3e635","#fff"], sp0: 40, sp1: 220, l0: .3, l1: .7, add: true, grav: -40 });
+    addFloatText(player.x, player.y - 74, "회복 완료!", "#8be9fd");
+    juice.flash = Math.max(juice.flash, 0.15);
+    startDialog(n.lines || ["푹 쉬었어요. 몸이 개운하죠?"], null, n.name);
+    saveGame();
+    return;
+  }
+  startDialog(n.lines || ["…"], null, n.name);   // info / shop / club
+}
+
 let dialog = null;   // { lines, i, speaker, onEnd }
 function startDialog(lines, onEnd, speaker){
   dialog = { lines, i: 0, onEnd: onEnd || null, speaker: speaker || "" };
@@ -604,17 +741,17 @@ function castNova(){
 }
 
 // ============================== SAVE (localStorage) ==============================
-const SAVE_KEY = "arcane_proto_save_v2";
+const SAVE_KEY = "arcane_proto_save_v3";
 let saveTimer = 8, saveFlash = 0, resetArm = 0;
 function saveGame(){
   try{
     localStorage.setItem(SAVE_KEY, JSON.stringify({
-      v: 2, level: player.level, exp: player.exp, stats: player.stats,
+      v: 3, level: player.level, exp: player.exp, stats: player.stats,
       skills: player.skills,
       quest: { idx: questState.idx, prog: questState.prog, doneAll: questState.doneAll },
       teachers: Object.fromEntries(TEACHERS.map(t=>[t.id, teacherState[t.id]])),
       bossDefeated: boss.defeated,
-      map: curMapId, x: Math.round(player.x), best: combo.best,
+      map: curMapId, x: Math.round(player.x), y: Math.round(player.y), best: combo.best,
     }));
     saveFlash = 1.4;
   }catch(e){}
@@ -622,7 +759,7 @@ function saveGame(){
 function loadGame(){
   try{
     const d = JSON.parse(localStorage.getItem(SAVE_KEY) || "null");
-    if(!d || d.v !== 2) return;
+    if(!d || d.v !== 3) return;
     player.level = d.level; player.exp = d.exp;
     for(const k in player.stats) if(d.stats && d.stats[k]) player.stats[k] = d.stats[k];
     if(d.skills) Object.assign(player.skills, d.skills);
@@ -630,9 +767,10 @@ function loadGame(){
     if(d.teachers) for(const id in teacherState) if(d.teachers[id]) Object.assign(teacherState[id], d.teachers[id]);
     if(d.bossDefeated) boss.defeated = true;
     combo.best = d.best || 0;
-    loadMap(MAPS[d.map] ? d.map : "campus", d.x || 200);
+    const mid = MAPS[d.map] ? d.map : "campus";
+    loadMap(mid, d.x ?? 520, d.y);
     player.hp = maxHp(); player.mp = maxMp();
-    addFloatText(player.x, GROUND_Y - 110, "이어하기 — 저장 데이터 불러옴", "#8be9fd");
+    addFloatText(player.x, player.y - 110, "이어하기 — 저장 데이터 불러옴", "#8be9fd");
   }catch(e){}
 }
 
@@ -739,6 +877,19 @@ function updatePlayer(dt){
       }
     }
   }
+  // --- 계단(대각선 발판): 걸어서 부드럽게 오르내림 (본관 층 이동)
+  if(pl.vy >= 0 && pl.dropTimer <= 0){
+    for(const s of stairs){
+      const xa = Math.min(s.x0, s.x1), xb = Math.max(s.x0, s.x1);
+      if(pl.x < xa || pl.x > xb) continue;
+      const t = (pl.x - s.x0) / (s.x1 - s.x0);
+      const sy = s.y0 + (s.y1 - s.y0) * clamp(t, 0, 1);
+      if(prevFeet <= sy + STAIR_SNAP && pl.y >= sy - 6){
+        pl.y = sy; pl.vy = 0; pl.onGround = true;
+        break;
+      }
+    }
+  }
 
   // --- 스킬 (전부 수업으로 습득해야 사용 가능)
   if(!locked && inp.boltP() && skillUsable("bolt") && pl.boltCd <= 0 && !charging && pl.dashTimer <= 0){
@@ -784,10 +935,10 @@ function updatePlayer(dt){
 
 function respawnPlayer(){
   player.dead = false;
-  loadMap("campus", 200);
+  loadMap("school", 900, 1240);   // 본관 1F 양호실에서 깨어남
   player.hp = maxHp(); player.mp = maxMp();
   player.iframes = 2.0;
-  addFloatText(player.x, player.y - 80, "의무실에서 깨어났다 — 다시 도전!", "#8be9fd");
+  addFloatText(player.x, player.y - 80, "양호실에서 깨어났다 — 다시 도전!", "#8be9fd");
 }
 
 function hurtPlayer(dmg, fromX){
@@ -1208,9 +1359,10 @@ function update(dt){
         }
       }
     }
-    if(!used && !transition && pressed["e"] && curMapId === "campus"){
-      for(const t of TEACHERS){
-        if(Math.abs(player.x - t.x) < 60){ talkToTeacher(t); used = true; break; }
+    if(!used && !transition && pressed["e"]){
+      for(const n of npcs){
+        const ny = n.y ?? GROUND_Y;
+        if(Math.abs(player.x - n.x) < 56 && Math.abs(player.y - ny) < 78){ talkNPC(n); used = true; break; }
       }
     }
     if(!used && !transition && pressed["e"] && mapDoor && Math.abs(player.x - mapDoor.x) < 62){
@@ -1277,36 +1429,41 @@ function update(dt){
 const cvs = document.getElementById("game");
 const ctx = cvs.getContext("2d");
 ctx.imageSmoothingEnabled = false;
-let camX = 0;
+let camX = 0, camY = 0;
 
 function render(){
-  const targetCam = clamp(player.x - VIEW_W/2, 0, Math.max(0, mapW - VIEW_W));
-  camX = lerp(camX, targetCam, 0.12);
+  const targetCamX = clamp(player.x - VIEW_W/2, 0, Math.max(0, mapW - VIEW_W));
+  const targetCamY = clamp(player.y - VIEW_H*0.62, 0, Math.max(0, mapH - VIEW_H));
+  camX = lerp(camX, targetCamX, 0.12);
+  camY = lerp(camY, targetCamY, 0.12);
   const sh = juice.shakeOffset();
 
   // --- 하늘 / 배경 톤
   const sky = ctx.createLinearGradient(0, 0, 0, VIEW_H);
   if(mapTheme === "campus"){
-    sky.addColorStop(0, "#1a1533");
-    sky.addColorStop(0.6, "#2c2350");
-    sky.addColorStop(1, "#3a2b55");
+    sky.addColorStop(0, "#1a1533"); sky.addColorStop(0.6, "#2c2350"); sky.addColorStop(1, "#3a2b55");
   }else if(mapTheme === "basement"){
-    sky.addColorStop(0, "#07080c");
-    sky.addColorStop(0.6, "#0d1013");
-    sky.addColorStop(1, "#12100e");
+    sky.addColorStop(0, "#07080c"); sky.addColorStop(0.6, "#0d1013"); sky.addColorStop(1, "#12100e");
+  }else if(mapTheme === "school"){
+    sky.addColorStop(0, "#14100c"); sky.addColorStop(1, "#1c1610");
+  }else if(mapTheme === "town"){
+    sky.addColorStop(0, "#241a33"); sky.addColorStop(0.55, "#3e2c45"); sky.addColorStop(1, "#5a3f47");
+  }else if(mapTheme === "harbor"){
+    sky.addColorStop(0, "#1a2540"); sky.addColorStop(0.5, "#2b3f63"); sky.addColorStop(1, "#4a5f7d");
   }else{
-    sky.addColorStop(0, "#141a33");
-    sky.addColorStop(0.6, "#23294d");
-    sky.addColorStop(1, "#31294a");
+    sky.addColorStop(0, "#141a33"); sky.addColorStop(0.6, "#23294d"); sky.addColorStop(1, "#31294a");
   }
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, VIEW_W, VIEW_H);
 
-  // 달 (지하실엔 없음)
-  if(mapTheme !== "basement"){
+  // 달/해 (실내·지하실 제외)
+  if(mapTheme === "harbor"){
+    ctx.fillStyle = "#ffe9b0";
+    ctx.beginPath(); ctx.arc(980 - camX*0.05, 130, 44, 0, Math.PI*2); ctx.fill();
+  }else if(mapTheme !== "basement" && mapTheme !== "school"){
     ctx.fillStyle = "#e9e6ff";
     ctx.beginPath(); ctx.arc(1080 - camX*0.05, 110, 38, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = mapTheme === "campus" ? "#1a1533" : "#141a33";
+    ctx.fillStyle = mapTheme === "campus" ? "#1a1533" : mapTheme === "town" ? "#241a33" : "#141a33";
     ctx.beginPath(); ctx.arc(1094 - camX*0.05, 100, 34, 0, Math.PI*2); ctx.fill();
   }
 
@@ -1352,7 +1509,7 @@ function render(){
       ctx.fillStyle = "rgba(40,60,40,.25)";
       ctx.beginPath(); ctx.ellipse(x, 140 + (i*63 % 260), 60, 34, 0, 0, Math.PI*2); ctx.fill();
     }
-  }else{
+  }else if(mapTheme === "forest"){
     for(const t of bgTrees){
       const par = t.layer === 0 ? 0.35 : 0.6;
       const x = t.x - camX * par;
@@ -1367,52 +1524,67 @@ function render(){
     }
   }
 
-  ctx.translate(-camX, 0);
+  ctx.translate(-camX, -camY);
+  drawWorldBackdrop();
 
   // --- 지형
+  const GT = {
+    campus:   { base:"#3a3f55", top:"#565f7d" },
+    basement: { base:"#22201c", top:"#33302a" },
+    school:   { base:"#3b2c1d", top:"#5a4126" },
+    town:     { base:"#4a3d33", top:"#6b5a45" },
+    harbor:   { base:"#5a4130", top:"#7a5738" },
+    forest:   { base:"#2d3b2d", top:"#4a6741" },
+  };
   for(const pf of platforms){
+    const g = GT[mapTheme] || GT.forest;
     if(pf.solidGround){
-      if(mapTheme === "campus"){
-        ctx.fillStyle = "#3a3f55";
-        ctx.fillRect(pf.x, pf.y, pf.w, pf.h);
-        ctx.fillStyle = "#565f7d";
-        ctx.fillRect(pf.x, pf.y, pf.w, 10);
-        ctx.fillStyle = "rgba(0,0,0,.15)";
-        for(let bx = 0; bx < pf.w; bx += 90) ctx.fillRect(pf.x + bx, pf.y + 10, 3, pf.h - 10);
-      }else if(mapTheme === "basement"){
-        ctx.fillStyle = "#22201c";
-        ctx.fillRect(pf.x, pf.y, pf.w, pf.h);
-        ctx.fillStyle = "#33302a";
-        ctx.fillRect(pf.x, pf.y, pf.w, 8);
-        ctx.fillStyle = "rgba(0,0,0,.3)";
-        for(let bx = 0; bx < pf.w; bx += 70) ctx.fillRect(pf.x + bx, pf.y + 8, 2, pf.h - 8);
-      }else{
-        ctx.fillStyle = "#2d3b2d";
-        ctx.fillRect(pf.x, pf.y, pf.w, pf.h);
-        ctx.fillStyle = "#4a6741";
-        ctx.fillRect(pf.x, pf.y, pf.w, 10);
-      }
+      ctx.fillStyle = g.base; ctx.fillRect(pf.x, pf.y, pf.w, pf.h);
+      ctx.fillStyle = g.top;  ctx.fillRect(pf.x, pf.y, pf.w, 10);
+      ctx.fillStyle = "rgba(0,0,0,.2)";
+      const step = mapTheme === "harbor" ? 40 : 84;   // 항구=널빤지
+      for(let bx = 0; bx < pf.w; bx += step) ctx.fillRect(pf.x + bx, pf.y + 10, 2, pf.h - 10);
     }else{
-      ctx.fillStyle = mapTheme === "campus" ? "#4a4f6a" : mapTheme === "basement" ? "#2d2a24" : "#5b4636";
-      ctx.fillRect(pf.x, pf.y, pf.w, pf.h);
-      ctx.fillStyle = mapTheme === "campus" ? "#6a7194" : mapTheme === "basement" ? "#403b32" : "#7a9b5e";
-      ctx.fillRect(pf.x, pf.y, pf.w, 5);
+      ctx.fillStyle = g.base; ctx.fillRect(pf.x, pf.y, pf.w, pf.h);
+      ctx.fillStyle = g.top;  ctx.fillRect(pf.x, pf.y, pf.w, 5);
     }
+  }
+
+  // --- 계단(대각선) 렌더
+  for(const s of stairs){
+    const xa = Math.min(s.x0, s.x1), xb = Math.max(s.x0, s.x1);
+    const ya = (xa === s.x0) ? s.y0 : s.y1, yb = (xb === s.x0) ? s.y0 : s.y1;
+    const steps = Math.max(4, Math.round((xb - xa) / 42));
+    for(let i = 0; i < steps; i++){
+      const t0 = i / steps, t1 = (i + 1) / steps;
+      const sx = xa + (xb - xa) * t0, sy = ya + (yb - ya) * t0;
+      const nx = xa + (xb - xa) * t1;
+      ctx.fillStyle = "#43301e";
+      ctx.fillRect(sx, sy, (nx - sx) + 2, 14);                 // 디딤판
+      ctx.fillStyle = "#5a4126";
+      ctx.fillRect(sx, sy, (nx - sx) + 2, 5);
+      ctx.fillStyle = "#2c2013";
+      ctx.fillRect(sx, sy + 14, (nx - sx) + 2, (yb > ya ? 0 : (ya - yb) / steps) + 6); // 옆판
+    }
+    // 난간
+    ctx.strokeStyle = "#6a4c2c"; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(s.x0, s.y0 - 40); ctx.lineTo(s.x1, s.y1 - 40); ctx.stroke();
   }
 
   // --- 안내판
   ctx.textAlign = "center";
   for(const s of signs){
+    const sy = s.y ?? GROUND_Y;
     ctx.fillStyle = "#6b4f2e";
-    ctx.fillRect(s.x - 4, GROUND_Y - 46, 8, 46);
+    ctx.fillRect(s.x - 4, sy - 46, 8, 46);
     ctx.font = "bold 15px sans-serif";
-    const w = Math.max(140, ctx.measureText(s.text).width + 24);
+    const w = Math.max(120, ctx.measureText(s.text).width + 24);
     ctx.fillStyle = "#8a683d";
-    ctx.fillRect(s.x - w/2, GROUND_Y - 88, w, 40);
+    ctx.fillRect(s.x - w/2, sy - 88, w, 40);
     ctx.strokeStyle = "#5b4426"; ctx.lineWidth = 3;
-    ctx.strokeRect(s.x - w/2, GROUND_Y - 88, w, 40);
+    ctx.strokeRect(s.x - w/2, sy - 88, w, 40);
     ctx.fillStyle = "#fdf2d0";
-    ctx.fillText(s.text, s.x, GROUND_Y - 63);
+    ctx.fillText(s.text, s.x, sy - 63);
   }
 
   // --- 포탈
@@ -1420,27 +1592,40 @@ function render(){
     const py = p.y ?? GROUND_Y;
     const pulse = 0.6 + Math.sin(performance.now()/300) * 0.25;
     const tint = p.tint || "#8b5cf6";
-    ctx.fillStyle = mapTheme === "campus" ? "#565f7d" : mapTheme === "basement" ? "#2d2a24" : "#5b4636";
-    ctx.fillRect(p.x - 44, py - 130, 12, 130);
-    ctx.fillRect(p.x + 32, py - 130, 12, 130);
-    ctx.fillRect(p.x - 50, py - 142, 100, 14);
-    if(p.down){
-      // 아래로 내려가는 계단 입구 느낌
-      ctx.fillStyle = "#0a0b0f";
-      ctx.fillRect(p.x - 32, py - 128, 64, 128);
-      ctx.fillStyle = "rgba(0,0,0,.55)";
-      for(let s = 0; s < 5; s++) ctx.fillRect(p.x - 30 + s*4, py - 24 - s*22, 60 - s*8, 8);
+    if(p.door){
+      // 건물 출입문
+      ctx.fillStyle = "#2a1f16"; ctx.fillRect(p.x - 40, py - 152, 80, 152);
+      ctx.fillStyle = "#5a3f26"; ctx.fillRect(p.x - 34, py - 146, 68, 146);
+      ctx.fillStyle = "#43301e";
+      ctx.fillRect(p.x - 30, py - 142, 27, 140); ctx.fillRect(p.x + 3, py - 142, 27, 140);
+      ctx.fillStyle = "#caa24a";
+      ctx.beginPath(); ctx.arc(p.x - 7, py - 72, 4, 0, Math.PI*2); ctx.arc(p.x + 7, py - 72, 4, 0, Math.PI*2); ctx.fill();
+      ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = pulse * 0.5;
+      const dg = ctx.createRadialGradient(p.x, py - 78, 4, p.x, py - 78, 64);
+      dg.addColorStop(0, tint); dg.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = dg; ctx.beginPath(); ctx.arc(p.x, py - 78, 64, 0, Math.PI*2); ctx.fill(); ctx.restore();
+    }else{
+      ctx.fillStyle = mapTheme === "campus" ? "#565f7d" : mapTheme === "basement" ? "#2d2a24" : "#5b4636";
+      ctx.fillRect(p.x - 44, py - 130, 12, 130);
+      ctx.fillRect(p.x + 32, py - 130, 12, 130);
+      ctx.fillRect(p.x - 50, py - 142, 100, 14);
+      if(p.down){
+        ctx.fillStyle = "#0a0b0f";
+        ctx.fillRect(p.x - 32, py - 128, 64, 128);
+        ctx.fillStyle = "rgba(0,0,0,.55)";
+        for(let s = 0; s < 5; s++) ctx.fillRect(p.x - 30 + s*4, py - 24 - s*22, 60 - s*8, 8);
+      }
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.globalAlpha = pulse;
+      const pg = ctx.createRadialGradient(p.x, py - 65, 4, p.x, py - 65, 46);
+      pg.addColorStop(0, "#ffffff");
+      pg.addColorStop(0.4, tint);
+      pg.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = pg;
+      ctx.beginPath(); ctx.ellipse(p.x, py - 65, 34, 58, 0, 0, Math.PI*2); ctx.fill();
+      ctx.restore();
     }
-    ctx.save();
-    ctx.globalCompositeOperation = "lighter";
-    ctx.globalAlpha = pulse;
-    const pg = ctx.createRadialGradient(p.x, py - 65, 4, p.x, py - 65, 46);
-    pg.addColorStop(0, "#ffffff");
-    pg.addColorStop(0.4, tint);
-    pg.addColorStop(1, "rgba(0,0,0,0)");
-    ctx.fillStyle = pg;
-    ctx.beginPath(); ctx.ellipse(p.x, py - 65, 34, 58, 0, 0, Math.PI*2); ctx.fill();
-    ctx.restore();
     ctx.textAlign = "center";
     ctx.font = "bold 13px sans-serif"; ctx.fillStyle = "#c4b5fd";
     ctx.fillText(p.label, p.x, py - 152);
@@ -1448,7 +1633,7 @@ function render(){
       ctx.fillStyle = "rgba(10,12,24,.8)";
       roundRect(p.x - 44, py - 186, 88, 22, 6); ctx.fill();
       ctx.fillStyle = "#8be9fd";
-      ctx.fillText(p.down ? "↑ 내려가기" : "↑ 이동", p.x, py - 170);
+      ctx.fillText(p.door ? "↑ 들어가기" : p.down ? "↑ 내려가기" : "↑ 이동", p.x, py - 170);
     }
   }
 
@@ -1542,10 +1727,8 @@ function render(){
     ctx.restore();
   }
 
-  // --- 교사 (캠퍼스)
-  if(curMapId === "campus"){
-    for(const t of TEACHERS) drawTeacher(t);
-  }
+  // --- NPC (교사·양호·매점·안내·주민 등)
+  for(const n of npcs) drawNPC(n);
 
   // --- 몬스터
   for(const m of monsters){
@@ -1736,10 +1919,10 @@ function render(){
     ctx.fillRect(0, 0, VIEW_W, VIEW_H);
   }
 
-  // 지하실 비네트 (시야 제한 + 지팡이 오브 주변만 은은히 밝게)
+  // 지하실 비네트 (시야 제한 — 플레이어 주변만 은은히 밝게)
   if(mapTheme === "basement"){
-    const plsx = player.x - camX + juice.shakeOffset().x*0;
-    const vg = ctx.createRadialGradient(plsx, VIEW_H/2, 120, plsx, VIEW_H/2, 640);
+    const plsx = player.x - camX, plsy = player.y - camY - 40;
+    const vg = ctx.createRadialGradient(plsx, plsy, 120, plsx, plsy, 640);
     vg.addColorStop(0, "rgba(0,0,0,0)");
     vg.addColorStop(0.6, "rgba(3,4,7,0.4)");
     vg.addColorStop(1, "rgba(2,3,5,0.82)");
@@ -1754,6 +1937,101 @@ function render(){
     const a = transition.phase === "out" ? Math.min(1, transition.t) : Math.max(0, 1 - transition.t);
     ctx.fillStyle = `rgba(5,6,14,${a})`;
     ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+  }
+}
+
+// 월드 좌표 배경(실내/마을/항구) — translate(-camX,-camY) 이후 호출
+function drawWorldBackdrop(){
+  const vx0 = camX - 100, vx1 = camX + VIEW_W + 100;
+  if(mapTheme === "school"){
+    // 목재/석재 벽 타일
+    const ty0 = Math.floor(camY/44)*44, ty1 = camY + VIEW_H + 44;
+    const tx0 = Math.floor(camX/88)*88, tx1 = camX + VIEW_W + 88;
+    for(let wy = ty0; wy < ty1; wy += 44){
+      for(let wx = tx0; wx < tx1; wx += 88){
+        ctx.fillStyle = ((Math.floor(wx/88) + Math.floor(wy/44)) % 2) ? "#241c16" : "#2a2019";
+        ctx.fillRect(wx, wy, 86, 42);
+      }
+    }
+    // 층 사이 아치 창(달빛)
+    for(const fy of [1240, 830, 420]){
+      for(let wx = 240; wx < mapW - 180; wx += 400){
+        if(wx < vx0 - 120 || wx > vx1 + 120) continue;
+        const wyt = fy - 168;
+        ctx.fillStyle = "#0d1626";
+        ctx.fillRect(wx, wyt, 92, 120);
+        ctx.beginPath(); ctx.arc(wx + 46, wyt, 46, Math.PI, 0); ctx.fill();
+        ctx.save(); ctx.globalCompositeOperation = "lighter";
+        const g = ctx.createLinearGradient(0, wyt - 46, 0, wyt + 120);
+        g.addColorStop(0, "rgba(150,180,255,.30)"); g.addColorStop(1, "rgba(150,180,255,0)");
+        ctx.fillStyle = g; ctx.fillRect(wx - 6, wyt - 46, 104, 170);
+        ctx.restore();
+        ctx.strokeStyle = "#3a2c1e"; ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.arc(wx + 46, wyt, 46, Math.PI, 0); ctx.stroke();
+        ctx.strokeRect(wx, wyt, 92, 120);
+        ctx.beginPath(); ctx.moveTo(wx + 46, wyt - 46); ctx.lineTo(wx + 46, wyt + 120);
+        ctx.moveTo(wx, wyt + 34); ctx.lineTo(wx + 92, wyt + 34); ctx.stroke();
+      }
+    }
+    // 벽 등불(따뜻한 점광)
+    for(const fy of [1240, 830, 420]){
+      for(let wx = 120; wx < mapW; wx += 300){
+        if(wx < vx0 || wx > vx1) continue;
+        const ly = fy - 250;
+        ctx.save(); ctx.globalCompositeOperation = "lighter";
+        const fl = 0.7 + Math.sin(performance.now()/240 + wx) * 0.15;
+        const lg = ctx.createRadialGradient(wx, ly, 3, wx, ly, 120);
+        lg.addColorStop(0, `rgba(255,210,140,${0.5*fl})`); lg.addColorStop(1, "rgba(255,180,80,0)");
+        ctx.fillStyle = lg; ctx.beginPath(); ctx.arc(wx, ly, 120, 0, Math.PI*2); ctx.fill();
+        ctx.restore();
+        ctx.fillStyle = "#c8922e"; ctx.fillRect(wx - 4, ly - 6, 8, 14);
+      }
+    }
+  }else if(mapTheme === "town"){
+    // 뒤쪽 집들
+    for(let hx = 120; hx < mapW; hx += 360){
+      if(hx < vx0 - 200 || hx > vx1 + 200) continue;
+      const hh = 170 + (Math.floor(hx/360) % 3) * 40;
+      const bw = 210;
+      ctx.fillStyle = "#3a2f4a";
+      ctx.fillRect(hx, GROUND_Y - hh, bw, hh);
+      ctx.fillStyle = "#5a3f47";                       // 지붕
+      ctx.beginPath();
+      ctx.moveTo(hx - 16, GROUND_Y - hh);
+      ctx.lineTo(hx + bw/2, GROUND_Y - hh - 54);
+      ctx.lineTo(hx + bw + 16, GROUND_Y - hh);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "rgba(255,210,120,.55)";         // 창문
+      for(let r = 0; r < 2; r++) for(let c = 0; c < 3; c++)
+        ctx.fillRect(hx + 24 + c*60, GROUND_Y - hh + 34 + r*58, 30, 34);
+    }
+  }else if(mapTheme === "harbor"){
+    // 바다 + 파도
+    const seaTop = 470;
+    const sg = ctx.createLinearGradient(0, seaTop, 0, GROUND_Y);
+    sg.addColorStop(0, "#2c4a6e"); sg.addColorStop(1, "#1a3450");
+    ctx.fillStyle = sg; ctx.fillRect(camX - 20, seaTop, VIEW_W + 40, GROUND_Y - seaTop);
+    ctx.strokeStyle = "rgba(180,220,255,.25)"; ctx.lineWidth = 2;
+    for(let wy = seaTop + 20; wy < GROUND_Y; wy += 26){
+      ctx.beginPath();
+      for(let wx = camX - 20; wx < camX + VIEW_W + 20; wx += 40){
+        const yy = wy + Math.sin((wx + performance.now()/16)/60) * 3;
+        if(wx === camX - 20) ctx.moveTo(wx, yy); else ctx.lineTo(wx, yy);
+      }
+      ctx.stroke();
+    }
+    // 먼 배 실루엣
+    for(const sx of [700, 1500]){
+      if(sx < vx0 - 200 || sx > vx1 + 200) continue;
+      ctx.fillStyle = "#16283e";
+      ctx.beginPath();
+      ctx.moveTo(sx - 90, seaTop + 40); ctx.lineTo(sx + 90, seaTop + 40);
+      ctx.lineTo(sx + 60, seaTop + 74); ctx.lineTo(sx - 60, seaTop + 74);
+      ctx.closePath(); ctx.fill();
+      ctx.fillRect(sx - 4, seaTop - 40, 8, 80);
+      ctx.fillStyle = "#22384f";
+      ctx.beginPath(); ctx.moveTo(sx + 4, seaTop - 36); ctx.lineTo(sx + 54, seaTop + 8); ctx.lineTo(sx + 4, seaTop + 8); ctx.closePath(); ctx.fill();
+    }
   }
 }
 
@@ -1838,8 +2116,7 @@ function drawMysteryDoor(x){
   }
 }
 
-function drawTeacher(t){
-  const x = t.x, y = GROUND_Y;
+function drawTeacher(t, x, y){
   const st = teacherState[t.id];
   const lockedT = t.unlock && !t.unlock();
   // 교실 문(아치)
@@ -1896,11 +2173,51 @@ function drawTeacher(t){
   }
   ctx.font = "11px sans-serif"; ctx.fillStyle = lockedT ? "#64748b" : "#c4b5fd";
   ctx.fillText(t.name, x, y + 16);
-  if(!dialog && !player.dead && Math.abs(player.x - x) < 60){
+  if(!dialog && !player.dead && Math.abs(player.x - x) < 60 && Math.abs(player.y - y) < 76){
     ctx.fillStyle = "rgba(10,12,24,.8)";
     roundRect(x - 32, y - 134, 64, 22, 6); ctx.fill();
     ctx.font = "bold 13px sans-serif"; ctx.fillStyle = "#8be9fd";
     ctx.fillText("E 대화", x, y - 118);
+  }
+}
+
+// 범용 NPC 렌더 (교사는 drawTeacher로 위임)
+function drawNPC(n){
+  const y = n.y ?? GROUND_Y;
+  if(n.kind === "teacher"){ drawTeacher(teacherByRef(n.tref), n.x, y); return; }
+  const x = n.x;
+  const P2 = {
+    heal: { robe:"#3f7a6e", robeD:"#2c5850", em:"#8be9fd", mark:"+" },
+    shop: { robe:"#9a6b2e", robeD:"#734f20", em:"#fbbf24", mark:"$" },
+    club: { robe:"#4a7a4a", robeD:"#356035", em:"#a3e635", mark:"♪" },
+    info: { robe:"#4a4f7a", robeD:"#353a5e", em:"#c4b5fd", mark:"!" },
+  }[n.kind] || { robe:"#4a4f7a", robeD:"#353a5e", em:"#c4b5fd", mark:"!" };
+  // 몸
+  ctx.fillStyle = P2.robe; ctx.fillRect(x - 15, y - 48, 30, 48);
+  ctx.fillStyle = P2.robeD; ctx.fillRect(x - 15, y - 11, 30, 11);
+  // 머리
+  ctx.fillStyle = "#e8c9a0"; ctx.fillRect(x - 9, y - 62, 18, 15);
+  ctx.fillStyle = "#3a2c1e"; ctx.fillRect(x - 9, y - 64, 18, 5);   // 머리카락
+  ctx.fillStyle = "#1c1c28";
+  ctx.fillRect(x - 5, y - 57, 3, 4); ctx.fillRect(x + 2, y - 57, 3, 4);
+  // 역할 엠블럼 (머리 위)
+  const bob = Math.sin(performance.now()/300 + x) * 3;
+  ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = 0.6;
+  const eg = ctx.createRadialGradient(x, y - 80 + bob, 1, x, y - 80 + bob, 16);
+  eg.addColorStop(0, P2.em); eg.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = eg; ctx.beginPath(); ctx.arc(x, y - 80 + bob, 16, 0, Math.PI*2); ctx.fill();
+  ctx.restore();
+  ctx.textAlign = "center"; ctx.font = "bold 15px sans-serif"; ctx.fillStyle = P2.em;
+  ctx.fillText(P2.mark, x, y - 75 + bob);
+  // 이름
+  ctx.font = "11px sans-serif"; ctx.fillStyle = "#cbd5e1";
+  ctx.fillText(n.name, x, y + 15);
+  // 프롬프트
+  if(!dialog && !transition && !player.dead && Math.abs(player.x - x) < 56 && Math.abs(player.y - y) < 78){
+    ctx.fillStyle = "rgba(10,12,24,.8)";
+    roundRect(x - 30, y - 100, 60, 22, 6); ctx.fill();
+    ctx.fillStyle = "#8be9fd"; ctx.font = "bold 13px sans-serif";
+    ctx.fillText("E 대화", x, y - 84);
   }
 }
 
@@ -2283,7 +2600,7 @@ function renderHUD(){
 
   ctx.textAlign = "right";
   ctx.font = "11px sans-serif"; ctx.fillStyle = "rgba(148,163,184,.55)";
-  ctx.fillText("아르카나 아카데미 프로토타입 v0.7 — 지하실", VIEW_W - 14, 22);
+  ctx.fillText("아르카나 아카데미 프로토타입 v0.8 — 다층 본관·마을·항구", VIEW_W - 14, 22);
   if(saveFlash > 0){
     ctx.globalAlpha = Math.min(1, saveFlash);
     ctx.font = "12px sans-serif"; ctx.fillStyle = "#4ade80";
@@ -2449,7 +2766,7 @@ function roundRect(x, y, w, h, r){
 }
 
 // ============================== BOOT & MAIN LOOP ==============================
-loadMap("campus", 200);   // 신규 시작: 캠퍼스
+loadMap("campus", 560);   // 신규 시작: 교정 (본관 정문 근처)
 loadGame();               // 저장 데이터가 있으면 해당 진행으로 이어하기
 
 let last = performance.now(), acc = 0;
