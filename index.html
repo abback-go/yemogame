@@ -114,13 +114,19 @@ const inp = {
   bookP: ()=> pressed["Tab"],
 };
 
+// ============================== 옵션 (타이틀 화면에서 설정) ==============================
+const OPTS = { shake: 1, dmgNum: true };
+function saveOpts(){ try{ localStorage.setItem("arcane_opts_v1", JSON.stringify(OPTS)); }catch(e){} }
+function loadOpts(){ try{ const d = JSON.parse(localStorage.getItem("arcane_opts_v1")||"null"); if(d) Object.assign(OPTS, d); }catch(e){} }
+loadOpts();
+
 // ============================== JUICE ==============================
 const juice = {
   hitstop: 0, trauma: 0, flash: 0,
   addShake(t){ this.trauma = Math.min(1, this.trauma + t); },
   addHitstop(s){ this.hitstop = Math.max(this.hitstop, s); },
   shakeOffset(){
-    const s = this.trauma * this.trauma;
+    const s = this.trauma * this.trauma * OPTS.shake;
     return { x: rand(-1,1)*22*s, y: rand(-1,1)*16*s };
   },
 };
@@ -908,7 +914,7 @@ function updatePlayer(dt){
     return;
   }
 
-  const locked = dialog !== null || showBook || showTrainer || transition !== null;
+  const locked = dialog !== null || showBook || showTrainer || showWorldMap || transition !== null;
 
   // --- 타이머
   pl.boltCd = Math.max(0, pl.boltCd - dt);
@@ -1471,7 +1477,60 @@ function updateEprojs(dt){
 
 // ============================== UPDATE ==============================
 let showHelp = true, showBook = false, showTrainer = false, bookPage = 0;
+let gameState = "title", titleT = 0, showOptions = false, optResetArm = 0, showWorldMap = false;
+
+// 타이틀 버튼 영역
+const TITLE_BTN = {
+  play: { x: VIEW_W/2 - 150, y: 462, w: 300, h: 58 },
+  opts: { x: VIEW_W/2 - 150, y: 534, w: 300, h: 50 },
+};
+const OPT_ROWS = [   // 옵션 패널 행 (y는 renderOptions와 동일 계산)
+  { key: "shake", label: "화면 흔들림" },
+  { key: "dmg",   label: "데미지 숫자" },
+  { key: "reset", label: "저장 데이터 초기화" },
+  { key: "close", label: "닫기" },
+];
+function inRect(mx, my, r){ return mx >= r.x && mx <= r.x + r.w && my >= r.y && my <= r.y + r.h; }
+
+function updateTitle(dt){
+  titleT += dt;
+  optResetArm = Math.max(0, optResetArm - dt);
+  // 떠오르는 불꽃 파티클
+  if(Math.random() < 0.35)
+    spawnParticles(camX + rand(0, VIEW_W), camY + VIEW_H + 10,
+      { n: 1, col: ["#ff9d4d","#ffd27f","#7c5cff"], sp0: 20, sp1: 60, ang: -Math.PI/2, spread: .4, l0: 2.0, l1: 4.0, grav: -30, drag: 0.995, r0: 2, r1: 4 });
+  updateParticles(dt);
+
+  if(showOptions){
+    // 옵션: 클릭으로 값 순환 / Esc·닫기
+    if(pressed["Escape"]){ showOptions = false; }
+    if(mouse.clicked){
+      const px2 = VIEW_W/2 - 250, py = 200;
+      OPT_ROWS.forEach((row, i)=>{
+        const r = { x: px2 + 30, y: py + 70 + i*64, w: 440, h: 48 };
+        if(!inRect(mouse.x, mouse.y, r)) return;
+        if(row.key === "shake"){ OPTS.shake = OPTS.shake === 1 ? 0.5 : OPTS.shake === 0.5 ? 0 : 1; saveOpts(); }
+        else if(row.key === "dmg"){ OPTS.dmgNum = !OPTS.dmgNum; saveOpts(); }
+        else if(row.key === "reset"){
+          if(optResetArm > 0){ try{ localStorage.removeItem(SAVE_KEY); }catch(e){} location.reload(); }
+          else optResetArm = 3;
+        }
+        else if(row.key === "close") showOptions = false;
+      });
+    }
+  }else{
+    if(pressed["Enter"] || pressed["space"] || pressed["z"]){ gameState = "play"; }
+    if(mouse.clicked){
+      if(inRect(mouse.x, mouse.y, TITLE_BTN.play)) gameState = "play";
+      else if(inRect(mouse.x, mouse.y, TITLE_BTN.opts)) showOptions = true;
+    }
+  }
+  for(const k in pressed) pressed[k] = false;
+  mouse.clicked = false;
+}
+
 function update(dt){
+  if(gameState === "title"){ updateTitle(dt); return; }
   if(showTrainer){
     // 스킬 강화 패널: [1~5] 강화, E/Tab/Esc 닫기
     if(pressed["e"] || pressed["Tab"] || pressed["Escape"]){
@@ -1484,7 +1543,8 @@ function update(dt){
     }
   }else{
     if(inp.helpP()) showHelp = !showHelp;
-    if(inp.bookP()){ showBook = !showBook; bookPage = 0; }
+    if(inp.bookP()){ showBook = !showBook; showWorldMap = false; bookPage = 0; }
+    if(pressed["m"] || (showWorldMap && pressed["Escape"])){ showWorldMap = !showWorldMap; showBook = false; }
     if(showBook && (pressed["ArrowLeft"] || pressed["ArrowRight"])) bookPage = 1 - bookPage;
   }
 
@@ -1503,7 +1563,7 @@ function update(dt){
   // --- 대화 / 포탈 / 교사 상호작용
   if(dialog){
     if(pressed["e"] || pressed["z"] || pressed["space"]) advanceDialog();
-  }else if(!showBook && !showTrainer && !transition && !player.dead){
+  }else if(!showBook && !showTrainer && !showWorldMap && !transition && !player.dead){
     let used = false;
     if(player.onGround && (pressed["ArrowUp"] || pressed["e"])){
       for(const p of portals){
@@ -1577,6 +1637,7 @@ function update(dt){
   juice.trauma = Math.max(0, juice.trauma - dt*1.6);
   juice.flash = Math.max(0, juice.flash - dt*2);
   for(const k in pressed) pressed[k] = false;
+  mouse.clicked = false;
 }
 
 // ============================== RENDER ==============================
@@ -1584,6 +1645,15 @@ const cvs = document.getElementById("game");
 const ctx = cvs.getContext("2d");
 ctx.imageSmoothingEnabled = false;
 let camX = 0, camY = 0;
+
+// 마우스 (타이틀/옵션 버튼용) — CSS 스케일 보정
+const mouse = { x: 0, y: 0, clicked: false };
+cvs.addEventListener("click", e=>{
+  const r = cvs.getBoundingClientRect();
+  mouse.x = (e.clientX - r.left) * (cvs.width / r.width);
+  mouse.y = (e.clientY - r.top) * (cvs.height / r.height);
+  mouse.clicked = true;
+});
 
 function render(){
   const targetCamX = clamp(player.x - VIEW_W/2, 0, Math.max(0, mapW - VIEW_W));
@@ -2045,8 +2115,8 @@ function render(){
     ctx.restore();
   }
 
-  // --- 데미지 넘버
-  for(const n of dmgNumbers){
+  // --- 데미지 넘버 (옵션으로 끌 수 있음)
+  if(OPTS.dmgNum) for(const n of dmgNumbers){
     const k = n.t / n.life;
     const y = n.y - k*46;
     const scale = n.crit ? (k < 0.15 ? lerp(1.8, 1.2, k/0.15) : 1.2) : 1;
@@ -2097,7 +2167,11 @@ function render(){
     ctx.fillRect(0, 0, VIEW_W, VIEW_H);
   }
 
-  renderHUD();
+  if(gameState === "title"){
+    renderTitle();
+  }else{
+    renderHUD();
+  }
 
   // --- 맵 전환 페이드
   if(transition){
@@ -2105,6 +2179,267 @@ function render(){
     ctx.fillStyle = `rgba(5,6,14,${a})`;
     ctx.fillRect(0, 0, VIEW_W, VIEW_H);
   }
+}
+
+// ============================== 타이틀 화면 ==============================
+function renderTitle(){
+  // 월드 위에 어두운 마법빛 오버레이
+  const og = ctx.createLinearGradient(0, 0, 0, VIEW_H);
+  og.addColorStop(0, "rgba(8,6,20,.88)");
+  og.addColorStop(0.5, "rgba(10,8,26,.80)");
+  og.addColorStop(1, "rgba(6,5,16,.92)");
+  ctx.fillStyle = og;
+  ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+
+  ctx.save();
+  ctx.textAlign = "center";
+
+  // 로고
+  const bob = Math.sin(titleT * 1.4) * 6;
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  const lg = ctx.createRadialGradient(VIEW_W/2, 230 + bob, 20, VIEW_W/2, 230 + bob, 320);
+  lg.addColorStop(0, "rgba(150,110,255,.28)");
+  lg.addColorStop(1, "rgba(80,50,200,0)");
+  ctx.fillStyle = lg;
+  ctx.beginPath(); ctx.arc(VIEW_W/2, 230 + bob, 320, 0, Math.PI*2); ctx.fill();
+  ctx.restore();
+  ctx.font = "bold 20px sans-serif"; ctx.fillStyle = "#8be9fd";
+  ctx.fillText("마 법 학 교", VIEW_W/2, 180 + bob);
+  ctx.font = "900 74px sans-serif";
+  ctx.lineWidth = 10; ctx.strokeStyle = "rgba(0,0,0,.7)";
+  ctx.strokeText("아르카나 아카데미", VIEW_W/2, 258 + bob);
+  const tg = ctx.createLinearGradient(0, 210, 0, 270);
+  tg.addColorStop(0, "#ffe9c9"); tg.addColorStop(0.55, "#ffb35c"); tg.addColorStop(1, "#ff7b3a");
+  ctx.fillStyle = tg;
+  ctx.fillText("아르카나 아카데미", VIEW_W/2, 258 + bob);
+  ctx.font = "15px sans-serif"; ctx.fillStyle = "#94a3b8";
+  ctx.fillText("— 마법을 배우고, 시험을 넘고, 나만의 마법사를 키우는 도트 액션 RPG —", VIEW_W/2, 300 + bob);
+
+  // 캐릭터 (도트 스프라이트 확대)
+  const fr = MAGE.frames.idle[Math.floor(titleT * 2.5) % 2];
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(mageSheet, fr*MAGE.w, 0, MAGE.w, MAGE.h, VIEW_W/2 - 74, 322, MAGE.w*4.2, MAGE.h*4.2);
+  ctx.restore();
+
+  // 버튼
+  const hasSave = (()=>{ try{ return !!localStorage.getItem(SAVE_KEY); }catch(e){ return false; } })();
+  drawTitleBtn(TITLE_BTN.play, hasSave ? "이어하기" : "게임 시작", "#7c3aed", "#a78bfa", true);
+  drawTitleBtn(TITLE_BTN.opts, "옵션", "#1e293b", "#475569", false);
+
+  ctx.font = "12px sans-serif"; ctx.fillStyle = "rgba(148,163,184,.6)";
+  ctx.fillText("Enter / Space / 클릭으로 시작", VIEW_W/2, 612);
+  ctx.fillText("프로토타입 v0.10 — 아르카나 아카데미", VIEW_W/2, VIEW_H - 20);
+  ctx.restore();
+
+  if(showOptions) renderOptions();
+}
+
+function drawTitleBtn(r, label, col, border, big){
+  const hover = inRect(mouse.x, mouse.y, r);
+  ctx.save();
+  ctx.fillStyle = hover ? border : col;
+  roundRect(r.x, r.y, r.w, r.h, 12); ctx.fill();
+  ctx.strokeStyle = border; ctx.lineWidth = 2.5;
+  roundRect(r.x, r.y, r.w, r.h, 12); ctx.stroke();
+  ctx.textAlign = "center";
+  ctx.font = `bold ${big ? 22 : 18}px sans-serif`;
+  ctx.fillStyle = "#fff";
+  ctx.fillText(label, r.x + r.w/2, r.y + r.h/2 + (big ? 8 : 6));
+  ctx.restore();
+}
+
+function renderOptions(){
+  const PW = 500, PH = 360;
+  const px2 = VIEW_W/2 - PW/2, py = 200;
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,.55)";
+  ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+  ctx.fillStyle = "rgba(14,17,32,.97)";
+  roundRect(px2, py, PW, PH, 14); ctx.fill();
+  ctx.strokeStyle = "#475569"; ctx.lineWidth = 2;
+  roundRect(px2, py, PW, PH, 14); ctx.stroke();
+  ctx.textAlign = "left";
+  ctx.font = "bold 20px sans-serif"; ctx.fillStyle = "#8be9fd";
+  ctx.fillText("옵션", px2 + 30, py + 42);
+
+  OPT_ROWS.forEach((row, i)=>{
+    const r = { x: px2 + 30, y: py + 70 + i*64, w: PW - 60, h: 48 };
+    const hover = inRect(mouse.x, mouse.y, r);
+    ctx.fillStyle = hover ? "rgba(139,233,253,.1)" : "rgba(0,0,0,.3)";
+    roundRect(r.x, r.y, r.w, r.h, 9); ctx.fill();
+    ctx.font = "bold 15px sans-serif";
+    ctx.fillStyle = row.key === "reset" ? (optResetArm > 0 ? "#f87171" : "#e2e8f0") : "#e2e8f0";
+    const label = row.key === "reset" && optResetArm > 0 ? "정말 초기화할까요? 한 번 더 클릭" : row.label;
+    ctx.fillText(label, r.x + 18, r.y + 30);
+    // 값 표시
+    ctx.textAlign = "right";
+    ctx.fillStyle = "#fbbf24";
+    if(row.key === "shake") ctx.fillText(OPTS.shake === 1 ? "강" : OPTS.shake === 0.5 ? "약" : "끔", r.x + r.w - 18, r.y + 30);
+    if(row.key === "dmg")   ctx.fillText(OPTS.dmgNum ? "켬" : "끔", r.x + r.w - 18, r.y + 30);
+    ctx.textAlign = "left";
+  });
+  ctx.font = "11px sans-serif"; ctx.fillStyle = "#64748b";
+  ctx.fillText("클릭으로 변경 · Esc 닫기 (설정은 자동 저장)", px2 + 30, py + PH - 18);
+  ctx.restore();
+}
+
+// ============================== 미니맵 & 월드맵 ==============================
+function renderMinimap(){
+  const bx = VIEW_W - 316, by = 14, bw = 300, bh = 96;
+  ctx.save();
+  ctx.fillStyle = "rgba(10,12,24,.72)";
+  roundRect(bx, by, bw, bh, 10); ctx.fill();
+  // 맵 이름
+  ctx.textAlign = "left";
+  ctx.font = "bold 12px sans-serif"; ctx.fillStyle = "#c4b5fd";
+  ctx.fillText(MAPS[curMapId].name, bx + 12, by + 18);
+  ctx.textAlign = "right";
+  ctx.font = "10px sans-serif"; ctx.fillStyle = "#64748b";
+  ctx.fillText("M 월드맵", bx + bw - 10, by + 18);
+  // 지도 영역
+  const cx0 = bx + 10, cy0 = by + 26, cw = bw - 20, ch = bh - 36;
+  const s = Math.min(cw / mapW, ch / mapH);
+  const ox = cx0 + (cw - mapW * s) / 2, oy = cy0 + (ch - mapH * s) / 2;
+  ctx.fillStyle = "rgba(0,0,0,.35)";
+  ctx.fillRect(cx0, cy0, cw, ch);
+  // 지형
+  ctx.fillStyle = "#5a637f";
+  for(const pf of platforms){
+    ctx.fillRect(ox + pf.x * s, oy + pf.y * s, Math.max(1.5, pf.w * s), Math.max(1.5, pf.h * s * 0.6));
+  }
+  // 계단
+  ctx.strokeStyle = "#5a637f"; ctx.lineWidth = 1.5;
+  for(const st of stairs){
+    ctx.beginPath();
+    ctx.moveTo(ox + st.x0 * s, oy + st.y0 * s);
+    ctx.lineTo(ox + st.x1 * s, oy + st.y1 * s);
+    ctx.stroke();
+  }
+  // 포탈/문
+  for(const p of portals){
+    const py2 = p.y ?? GROUND_Y;
+    ctx.fillStyle = p.tint || "#8b5cf6";
+    ctx.beginPath(); ctx.arc(ox + p.x * s, oy + (py2 - 40) * s, 2.4, 0, Math.PI*2); ctx.fill();
+  }
+  // NPC
+  ctx.fillStyle = "#fbbf24";
+  for(const n of npcs){
+    const ny = n.y ?? GROUND_Y;
+    ctx.fillRect(ox + n.x * s - 1.5, oy + (ny - 40) * s - 1.5, 3, 3);
+  }
+  // 몬스터
+  for(const m of monsters){
+    if(m.dead) continue;
+    ctx.fillStyle = m.type === "dummy" ? "#9a7b4f" : m.type === "boss" ? "#ff5040" : "#ef4444";
+    ctx.fillRect(ox + m.x * s - 1.5, oy + (m.y - 20) * s - 1.5, m.type === "boss" ? 5 : 3, m.type === "boss" ? 5 : 3);
+  }
+  // 플레이어 (깜빡임)
+  const blink = 0.6 + Math.sin(performance.now()/180) * 0.4;
+  ctx.save();
+  ctx.globalAlpha = blink;
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath(); ctx.arc(ox + player.x * s, oy + (player.y - 24) * s, 3, 0, Math.PI*2); ctx.fill();
+  ctx.restore();
+  ctx.restore();
+}
+
+// 월드맵 노드 (아르피아/메이플식 지역 연결도)
+const WORLD_NODES = [
+  { id:"basement", name:"학교 지하실",   x: 205, y: 355, col:"#4ade80" },
+  { id:"school",   name:"본관",          x: 330, y: 250, col:"#ffd27f",
+    rooms:["classbasic","classinter","classadv","library","principal","infirmary","shoproom"] },
+  { id:"campus",   name:"교정",          x: 495, y: 250, col:"#c4b5fd", rooms:["clubroom"] },
+  { id:"forest",   name:"입문의 숲",     x: 665, y: 160, col:"#5fd068", tag:"사냥터 · 시험장" },
+  { id:"road1",    name:"학교 뒷숲",     x: 665, y: 340, col:"#5fd068" },
+  { id:"village",  name:"여명 마을",     x: 800, y: 340, col:"#f0abfc" },
+  { id:"harbor",   name:"소금바람 항구", x: 800, y: 445, col:"#7dd3fc", tag:"출항 준비 중…" },
+];
+const WORLD_EDGES = [
+  ["basement","school"], ["school","campus"], ["campus","forest"],
+  ["campus","road1"], ["road1","village"], ["village","harbor"],
+];
+function worldNodeOf(mapId){
+  return WORLD_NODES.find(n => n.id === mapId || (n.rooms && n.rooms.includes(mapId)));
+}
+
+function renderWorldMap(){
+  const PW = 960, PH = 540;
+  const px2 = (VIEW_W - PW)/2, py = (VIEW_H - PH)/2;
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,.6)";
+  ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+  // 양피지 느낌 패널
+  ctx.fillStyle = "rgba(18,16,28,.97)";
+  roundRect(px2, py, PW, PH, 16); ctx.fill();
+  ctx.strokeStyle = "#8a683d"; ctx.lineWidth = 3;
+  roundRect(px2, py, PW, PH, 16); ctx.stroke();
+  ctx.strokeStyle = "rgba(138,104,61,.35)"; ctx.lineWidth = 1;
+  roundRect(px2 + 10, py + 10, PW - 20, PH - 20, 12); ctx.stroke();
+
+  ctx.textAlign = "left";
+  ctx.font = "bold 22px sans-serif"; ctx.fillStyle = "#ffd27f";
+  ctx.fillText("월드맵 — 아르카나 일대", px2 + 34, py + 46);
+  ctx.font = "12px sans-serif"; ctx.fillStyle = "#94a3b8";
+  ctx.fillText("M / Esc 닫기", px2 + PW - 120, py + 44);
+
+  // 연결선 (점선 길)
+  ctx.save();
+  ctx.setLineDash([7, 6]);
+  ctx.strokeStyle = "#6b5a3d"; ctx.lineWidth = 3;
+  for(const [a, b] of WORLD_EDGES){
+    const na = WORLD_NODES.find(n=>n.id===a), nb = WORLD_NODES.find(n=>n.id===b);
+    ctx.beginPath();
+    ctx.moveTo(px2 + na.x, py + na.y);
+    ctx.lineTo(px2 + nb.x, py + nb.y);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // 노드
+  const cur = worldNodeOf(curMapId);
+  for(const n of WORLD_NODES){
+    const nx = px2 + n.x, ny = py + n.y;
+    const isCur = cur && cur.id === n.id;
+    // 현재 위치 링
+    if(isCur){
+      const pulse = 8 + Math.sin(performance.now()/240) * 3;
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.strokeStyle = "rgba(139,233,253,.8)"; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(nx, ny, 34 + pulse, 0, Math.PI*2); ctx.stroke();
+      ctx.restore();
+    }
+    // 노드 박스
+    ctx.font = "bold 14px sans-serif";
+    const w = Math.max(96, ctx.measureText(n.name).width + 34);
+    ctx.fillStyle = isCur ? "rgba(139,233,253,.14)" : "rgba(0,0,0,.5)";
+    roundRect(nx - w/2, ny - 20, w, 40, 10); ctx.fill();
+    ctx.strokeStyle = n.col; ctx.lineWidth = isCur ? 3 : 2;
+    roundRect(nx - w/2, ny - 20, w, 40, 10); ctx.stroke();
+    ctx.fillStyle = n.col;
+    ctx.beginPath(); ctx.arc(nx - w/2 + 15, ny, 5, 0, Math.PI*2); ctx.fill();
+    ctx.textAlign = "left";
+    ctx.fillStyle = isCur ? "#fff" : "#d6dcec";
+    ctx.fillText(n.name, nx - w/2 + 27, ny + 5);
+    // 부가 태그
+    if(n.tag){
+      ctx.font = "10px sans-serif"; ctx.fillStyle = "#64748b";
+      ctx.textAlign = "center";
+      ctx.fillText(n.tag, nx, ny + 34);
+    }
+    if(isCur){
+      ctx.font = "bold 11px sans-serif"; ctx.fillStyle = "#8be9fd";
+      ctx.textAlign = "center";
+      ctx.fillText("현재 위치", nx, ny - 28);
+    }
+  }
+  // 범례
+  ctx.textAlign = "left";
+  ctx.font = "11px sans-serif"; ctx.fillStyle = "#64748b";
+  ctx.fillText("본관 안의 시설(강의실·도서관·교장실·양호실·매점)과 동아리방은 각 건물 내부에 있습니다.", px2 + 34, py + PH - 22);
+  ctx.restore();
 }
 
 // 월드 좌표 배경(실내/마을/항구) — translate(-camX,-camY) 이후 호출
@@ -2590,14 +2925,8 @@ function renderHUD(){
   ctx.fillStyle = "#d9f99d"; ctx.font = "10px sans-serif";
   ctx.fillText(`EXP ${pl.exp} / ${need}`, 36, 96);
 
-  // 맵 이름
-  if(!(boss.active && BOSS_M && !BOSS_M.dead)){
-    ctx.textAlign = "center";
-    ctx.font = "bold 14px sans-serif";
-    ctx.fillStyle = "rgba(196,181,253,.75)";
-    ctx.fillText(MAPS[curMapId].name, VIEW_W/2, 30);
-    ctx.textAlign = "left";
-  }
+  // 미니맵 (우상단 — 맵 이름 포함)
+  renderMinimap();
 
   // 핫바 (Z X C V S Shift)
   const hotbarX = VIEW_W/2 - 188, hotbarY = VIEW_H - 74;
@@ -2704,15 +3033,15 @@ function renderHUD(){
     ctx.restore();
   });
 
-  // 콤보
+  // 콤보 (미니맵·트래커 아래)
   if(combo.count >= 2){
     ctx.textAlign = "center";
     const pulse = 1 + Math.max(0, combo.timer - 1.8) * 3;
     ctx.font = `bold ${Math.floor(30*pulse)}px sans-serif`;
     ctx.lineWidth = 5; ctx.strokeStyle = "rgba(0,0,0,.7)";
-    ctx.strokeText(`${combo.count} COMBO`, VIEW_W - 160, 90);
+    ctx.strokeText(`${combo.count} COMBO`, VIEW_W - 160, 300);
     ctx.fillStyle = combo.count >= 10 ? "#ffd93d" : "#ffb35c";
-    ctx.fillText(`${combo.count} COMBO`, VIEW_W - 160, 90);
+    ctx.fillText(`${combo.count} COMBO`, VIEW_W - 160, 300);
   }
 
   // 도움말
@@ -2729,7 +3058,7 @@ function renderHUD(){
       "Z 불티  /  X 홀드 화염구  /  C 화염 장판",
       "V 플레임 랜스(관통)  /  S 폭염 노바(광역)",
       "※ 모든 마법은 교수님 수업으로 배워야 사용 가능!",
-      "Tab 학생 수첩  /  자동 저장 (F2 두 번: 초기화)",
+      "Tab 학생 수첩  /  M 월드맵  /  자동 저장(F2×2 초기화)",
     ];
     lines.forEach((l, i)=> ctx.fillText(l, 30, VIEW_H - 165 + i*21));
   }else{
@@ -2739,6 +3068,7 @@ function renderHUD(){
 
   if(showBook) renderBook();
   if(showTrainer) renderTrainer();
+  if(showWorldMap) renderWorldMap();
 
   // 대화창
   if(dialog){
@@ -2769,7 +3099,7 @@ function renderHUD(){
 
   ctx.textAlign = "right";
   ctx.font = "11px sans-serif"; ctx.fillStyle = "rgba(148,163,184,.55)";
-  ctx.fillText("아르카나 아카데미 프로토타입 v0.9 — 스킬 강화·도감", VIEW_W - 14, 22);
+  ctx.fillText("아르카나 아카데미 프로토타입 v0.10 — 타이틀·미니맵·월드맵", VIEW_W - 14, 22);
   if(saveFlash > 0){
     ctx.globalAlpha = Math.min(1, saveFlash);
     ctx.font = "12px sans-serif"; ctx.fillStyle = "#4ade80";
