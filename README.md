@@ -38,7 +38,11 @@
 
 ## 문서
 
-- 게임 기획서: [`docs/arcane-academy-design.md`](docs/arcane-academy-design.md)
+- **📖 게임 기획서 (웹에서 읽기):** https://abback-go.github.io/yemogame/docs/
+- 원본 마크다운: [`docs/arcane-academy-design.md`](docs/arcane-academy-design.md)
+
+> 기획서 웹 페이지는 `docs/arcane-academy-design.md`를 변환한 것입니다.
+> 기획서 수정 시 `docs/index.html`도 함께 재생성해 주세요.
 
 ## 상태
 
