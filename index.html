@@ -189,9 +189,9 @@ const MAPS = {
   school: {
     name: "아르카나 아카데미 — 본관", w: 1720, h: 1300, tall: true, theme: "school",
     platforms: [
-      { x: 0,   y: 1240, w: 1720, h: 60, solidGround: true },   // 1F (전폭)
-      { x: 0,   y: 830,  w: 1250, h: 22, solidGround: true },   // 2F (0~1250, 우측 끝이 계단A 상단)
-      { x: 470, y: 420,  w: 1130, h: 22, solidGround: true },   // 3F (470~1600, 좌측이 계단B 상단)
+      { x: 0,   y: 1240, w: 1720, h: 60, solidGround: true, base: true },  // 1F (최하층 — 아래 점프 불가)
+      { x: 0,   y: 830,  w: 1250, h: 22, solidGround: true },   // 2F (↓+Space로 1F로 하강 가능)
+      { x: 470, y: 420,  w: 1130, h: 22, solidGround: true },   // 3F (↓+Space로 2F로 하강 가능)
     ],
     // 계단(대각선 발판): 상단=위층 가장자리, 하단=아래층. 계단 위를 위층 바닥이 덮지 않음.
     stairs: [
@@ -381,7 +381,7 @@ function loadMap(id, spawnX, spawnY){
   curMapId = id;
   mapW = M.w; mapH = M.h || VIEW_H; mapTheme = M.theme; mapTall = !!M.tall;
   // 평면 맵은 바닥 자동 추가, 다층(tall) 맵은 자체 층(solidGround) 사용
-  platforms = M.tall ? [...M.platforms] : [{ x: 0, y: GROUND_Y, w: M.w, h: 80, solidGround: true }, ...M.platforms];
+  platforms = M.tall ? [...M.platforms] : [{ x: 0, y: GROUND_Y, w: M.w, h: 80, solidGround: true, base: true }, ...M.platforms];
   stairs = M.stairs || [];
   signs = M.signs || []; portals = M.portals || [];
   npcs = (M.npcs || []).map(n => ({ ...n, y: n.y ?? GROUND_Y }));
@@ -831,9 +831,12 @@ function updatePlayer(dt){
     }
     if(!locked && inp.jumpP()){
       if(pl.onGround){
-        if(inp.down() && pl.standingOneway){
+        if(inp.down() && pl.standingDrop){
+          // 아래 점프: 발판·위층 바닥을 통과해 아래 블럭으로
           pl.dropTimer = P.dropTime;
           pl.onGround = false;
+          pl.vy = 60;   // 즉시 낙하 시작
+          spawnParticles(pl.x, pl.y + 2, { n: 5, col: "#cbd5e1", sp0: 20, sp1: 70, l0: .15, l1: .3, ang: Math.PI/2, spread: 1.0 });
         }else{
           pl.vy = P.jumpV;
           pl.onGround = false;
@@ -866,13 +869,16 @@ function updatePlayer(dt){
   pl.y += pl.vy*dt;
   pl.onGround = false;
   pl.standingOneway = false;
+  pl.standingDrop = false;
   if(pl.vy >= 0){
     for(const pf of platforms){
-      if(!pf.solidGround && pl.dropTimer > 0) continue;
+      // 하강 점프 중엔 최하층(base)을 제외한 모든 발판/층 통과
+      if(!pf.base && pl.dropTimer > 0) continue;
       if(pl.x < pf.x || pl.x > pf.x + pf.w) continue;
       if(prevFeet <= pf.y + 1 && pl.y >= pf.y){
         pl.y = pf.y; pl.vy = 0; pl.onGround = true;
         pl.standingOneway = !pf.solidGround;
+        pl.standingDrop = !pf.base;   // 최하층이 아니면 ↓+Space로 아래로
         break;
       }
     }
@@ -2556,7 +2562,7 @@ function renderHUD(){
     ctx.fillText("조작법 (H: 접기/펼치기)", 30, VIEW_H - 189);
     ctx.font = "13px sans-serif"; ctx.fillStyle = "#cbd5e1";
     const lines = [
-      "← → 이동  /  Space 점프  /  ↓+Space 하강",
+      "← → 이동  /  Space 점프  /  ↓+Space 아래 블럭으로",
       "Shift 대시(무적)  /  E 대화  /  ↑ 포탈 이동",
       "Z 불티  /  X 홀드 화염구  /  C 화염 장판",
       "V 플레임 랜스(관통)  /  S 폭염 노바(광역)",
