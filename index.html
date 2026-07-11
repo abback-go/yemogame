@@ -183,12 +183,11 @@ const MAPS = {
     ],
     portals: [
       { x: 420,  y: 640, to: "school",  tx: 150, ty: 1240, label: "본관", door: true, tint: "#ffd27f" },
+      { x: 780,  y: 640, to: "clubroom", tx: 820, ty: 640, label: "동아리방", door: true, tint: "#a3e635" },
       { x: 1760, y: 640, to: "road1",   tx: 150, ty: 640,  label: "마을 가는 길", tint: "#8be9fd" },
       { x: 2500, y: 640, to: "forest",  tx: 180, ty: 640,  label: "입문의 숲" },
     ],
     npcs: [
-      { kind: "club", name: "동아리 부장", x: 780, lines: [
-        "여긴 마법 동아리 별관이야!", "친목·서브 퀘스트… 동아리 활동은 곧 열릴 거야. 기대해!" ] },
       { kind: "trainer", name: "훈련 교관", x: 970 },
     ],
     mobs: [ ["dummy", 1100], ["dummy", 1190], ["dummy", 1280] ],
@@ -207,40 +206,109 @@ const MAPS = {
       { x0: 470,  y0: 409, x1: 120,  y1: 830 },    // 2F ↔ 3F
     ],
     signs: [
-      { x: 660,  y: 1240, text: "매점" },
-      { x: 900,  y: 1240, text: "양호실" },
       { x: 1120, y: 1240, text: "지하 계단 ↓" },
       { x: 1600, y: 1240, text: "2층 계단 ↑ →" },
-      { x: 1150, y: 830,  text: "초급 강의실" },
-      { x: 700,  y: 830,  text: "중급 강의실" },
-      { x: 400,  y: 830,  text: "도서관" },
       { x: 150,  y: 830,  text: "← 3층 계단 ↑" },
-      { x: 640,  y: 420,  text: "교장실" },
-      { x: 1100, y: 420,  text: "고급 강의실" },
     ],
+    // 복도의 문들 — 각 시설은 실제 방(별도 맵)
     portals: [
-      { x: 140,  y: 1240, to: "campus",   tx: 460, ty: 640,  label: "밖으로", door: true },
-      { x: 1120, y: 1240, to: "basement", tx: 150, ty: 210,  label: "지하실", tint: "#4ade80", down: true },
+      { x: 140,  y: 1240, to: "campus",     tx: 460, ty: 640,  label: "밖으로", door: true },
+      { x: 660,  y: 1240, to: "shoproom",   tx: 820, ty: 640,  label: "매점", door: true, tint: "#fbbf24" },
+      { x: 900,  y: 1240, to: "infirmary",  tx: 820, ty: 640,  label: "양호실", door: true, tint: "#8be9fd" },
+      { x: 1120, y: 1240, to: "basement",   tx: 150, ty: 210,  label: "지하실", tint: "#4ade80", down: true },
+      { x: 400,  y: 830,  to: "library",    tx: 820, ty: 640,  label: "도서관", door: true, tint: "#c4b5fd" },
+      { x: 700,  y: 830,  to: "classinter", tx: 820, ty: 640,  label: "중급 강의실", door: true, tint: "#f87171" },
+      { x: 1150, y: 830,  to: "classbasic", tx: 820, ty: 640,  label: "초급 강의실", door: true, tint: "#ffd27f" },
+      { x: 640,  y: 420,  to: "principal",  tx: 820, ty: 640,  label: "교장실", door: true, tint: "#fbbf24" },
+      { x: 1100, y: 420,  to: "classadv",   tx: 820, ty: 640,  label: "고급 강의실", door: true, tint: "#64748b" },
     ],
     npcs: [
       { kind: "info", name: "안내 데스크", x: 380, y: 1240, lines: [
         "아르카나 아카데미에 온 걸 환영해요!",
-        "계단을 올라 2층 강의실에서 마법을 배울 수 있어요. 3층엔 교장실과 고급 강의실이 있죠.",
+        "각 시설은 복도의 문(↑)으로 들어갈 수 있어요.",
+        "2층엔 강의실과 도서관, 3층엔 교장실과 고급 강의실이 있답니다.",
         "우측 계단으로 2층에 올라가 보세요!" ] },
-      { kind: "shop", name: "매점 상인", x: 660, y: 1240, lines: [
-        "매점입니다. 포션·간식·마도서 스크롤…", "상점 기능은 준비 중이에요. 조금만 기다려 주세요!" ] },
-      { kind: "heal", name: "양호 선생님", x: 900, y: 1240, lines: [
-        "다쳤군요? 이리 와요. 금방 낫게 해줄게요." ] },
-      { kind: "teacher", tref: "agnis", x: 1150, y: 830 },
-      { kind: "teacher", tref: "ignia", x: 700, y: 830 },
-      { kind: "info", name: "사서", x: 400, y: 830, lines: [
-        "도서관입니다. 스킬·몬스터 도감과 연구는 준비 중이에요.", "…쉿, 조용히 해주세요." ] },
-      { kind: "info", name: "교장", x: 640, y: 420, lines: [
-        "나는 이 학교의 교장일세.",
-        "학기말 실기 시험을 통과하면 중급 과정이 열리지. 정진하게.",
-        "언젠가… 지하실의 그 문에 대해서도 이야기할 날이 오겠군." ] },
-      { kind: "teacher", tref: "master", x: 1100, y: 420 },
     ],
+    mobs: [],
+  },
+
+  // ---------- 본관 내부 방들 (§3.5 시설 = 실제 공간) ----------
+  classbasic: {
+    name: "본관 2F — 초급 강의실", w: 1000, theme: "school",
+    platforms: [],
+    signs: [ { x: 300, text: "초급 화염술 — 기초부터 착실히!" } ],
+    portals: [ { x: 120, y: 640, to: "school", tx: 1150, ty: 830, label: "복도로", door: true } ],
+    npcs: [ { kind: "teacher", tref: "agnis", x: 600 } ],
+    mobs: [],
+  },
+  classinter: {
+    name: "본관 2F — 중급 강의실", w: 1000, theme: "school",
+    platforms: [],
+    signs: [ { x: 300, text: "중급 화염술 — 실기 시험 합격자만" } ],
+    portals: [ { x: 120, y: 640, to: "school", tx: 700, ty: 830, label: "복도로", door: true } ],
+    npcs: [ { kind: "teacher", tref: "ignia", x: 600 } ],
+    mobs: [],
+  },
+  classadv: {
+    name: "본관 3F — 고급 강의실", w: 1000, theme: "school",
+    platforms: [],
+    signs: [ { x: 300, text: "고급 화염술 — 출입 제한 구역" } ],
+    portals: [ { x: 120, y: 640, to: "school", tx: 1100, ty: 420, label: "복도로", door: true } ],
+    npcs: [ { kind: "teacher", tref: "master", x: 600 } ],
+    mobs: [],
+  },
+  library: {
+    name: "본관 2F — 도서관", w: 1100, theme: "school",
+    platforms: [ { x: 700, y: 540, w: 150, h: 14 } ],
+    signs: [
+      { x: 320, text: "도서관 — 정숙!" },
+      { x: 950, text: "금서 구역 — 출입 금지" },
+    ],
+    portals: [ { x: 120, y: 640, to: "school", tx: 400, ty: 830, label: "복도로", door: true } ],
+    npcs: [ { kind: "info", name: "사서", x: 560, lines: [
+      "도서관입니다. 스킬·몬스터 도감과 연구는 준비 중이에요.",
+      "…쉿, 조용히 해주세요.",
+      "금서 구역이요? …그건 물어보지 않는 게 좋아요." ] } ],
+    mobs: [],
+  },
+  principal: {
+    name: "본관 3F — 교장실", w: 900, theme: "school",
+    platforms: [],
+    signs: [ { x: 300, text: "교장실" } ],
+    portals: [ { x: 120, y: 640, to: "school", tx: 640, ty: 420, label: "복도로", door: true } ],
+    npcs: [ { kind: "info", name: "교장", x: 560, lines: [
+      "나는 이 학교의 교장일세. 잘 왔네.",
+      "학기말 실기 시험을 통과하면 중급 과정이 열리지. 정진하게.",
+      "언젠가… 지하실의 그 문에 대해서도 이야기할 날이 오겠군." ] } ],
+    mobs: [],
+  },
+  infirmary: {
+    name: "본관 1F — 양호실", w: 900, theme: "school",
+    platforms: [],
+    signs: [ { x: 300, text: "양호실 — 안정을 취하세요" } ],
+    portals: [ { x: 120, y: 640, to: "school", tx: 900, ty: 1240, label: "복도로", door: true } ],
+    npcs: [ { kind: "heal", name: "양호 선생님", x: 560, lines: [
+      "다쳤군요? 이리 와요. 금방 낫게 해줄게요." ] } ],
+    mobs: [],
+  },
+  shoproom: {
+    name: "본관 1F — 매점", w: 900, theme: "school",
+    platforms: [],
+    signs: [ { x: 300, text: "매점 — 맛있는 간식과 물약!" } ],
+    portals: [ { x: 120, y: 640, to: "school", tx: 660, ty: 1240, label: "복도로", door: true } ],
+    npcs: [ { kind: "shop", name: "매점 상인", x: 560, lines: [
+      "어서 와요, 매점입니다! 포션·간식·마도서 스크롤…",
+      "상점 기능은 준비 중이에요. 조금만 기다려 주세요!" ] } ],
+    mobs: [],
+  },
+  clubroom: {
+    name: "동아리 별관 — 마법 동아리방", w: 1000, theme: "school",
+    platforms: [ { x: 620, y: 540, w: 140, h: 14 } ],
+    signs: [ { x: 300, text: "마법 동아리 「불꽃 연구회」" } ],
+    portals: [ { x: 120, y: 640, to: "campus", tx: 780, ty: 640, label: "밖으로", door: true } ],
+    npcs: [ { kind: "club", name: "동아리 부장", x: 560, lines: [
+      "어서 와, 여기가 우리 마법 동아리방이야!",
+      "친목·서브 퀘스트… 동아리 활동은 곧 열릴 거야. 기대해!" ] } ],
     mobs: [],
   },
 
@@ -485,7 +553,7 @@ function trainStat(key, amount, fromAction){
 
 // ============================== 퀘스트 ==============================
 const QUESTS = [
-  { name:"첫 등교",        desc:"강의동의 아그니스 교수에게 첫 수업 듣기", type:"lesson", target:"bolt", need:1,
+  { name:"첫 등교",        desc:"본관 2층 초급 강의실에서 첫 수업 듣기", type:"lesson", target:"bolt", need:1,
     rewards:[["wil","소"]], exp:15 },
   { name:"마력 응축 훈련", desc:"「화염 응축」 수업 이수 (화염구 습득)", type:"lesson", target:"fireball", need:1,
     rewards:[["mag","소"]], exp:25 },
@@ -538,7 +606,7 @@ const TEACHERS = [
         lines:[
           "왔구나, 신입생! 나는 초급 화염술 담당 아그니스다.",
           "마법은 '배워야' 쓸 수 있는 법. 첫 술식 「불티」를 임시 각인해주마.",
-          "Z 키다. 오른쪽 훈련장의 허수아비에 6번 맞혀 보거라!",
+          "Z 키다. 교정 훈련장의 허수아비에 6번 맞혀 보거라!",
         ] },
       { skill:"fireball", name:"화염 응축", task:"maxChargeHit", need:2,
         desc:"MAX 차지 화염구 2회 명중", rewards:[["mag","중"]], exp:30,
@@ -2592,7 +2660,7 @@ function renderHUD(){
       }else{
         ctx.fillText("수업 가능!", VIEW_W - 302, 216);
         ctx.font = "12px sans-serif"; ctx.fillStyle = "#cbd5e1";
-        ctx.fillText(`캠퍼스 강의동 — ${info.t.name} (${info.t.title})`, VIEW_W - 302, 236);
+        ctx.fillText(`본관 강의실 — ${info.t.name} (${info.t.title})`, VIEW_W - 302, 236);
       }
     }
   }
