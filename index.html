@@ -28,7 +28,7 @@ const VIEW_W = 1280, VIEW_H = 720;
 const GROUND_Y = 640;
 const DT = 1 / 120;
 const GRAV = 2600;
-const GATE_X = 3620, ARENA_L = 3660, ARENA_R = 4360;   // 숲: 학기말 실기 시험장
+const GATE_X = 6020, ARENA_L = 6060, ARENA_R = 6760;   // 깊은 숲 동쪽 끝: 학기말 실기 시험장
 const STAIR_SNAP = 18;   // 계단(대각선 발판) 흡착 허용치
 
 const P = {
@@ -188,51 +188,55 @@ const combo = { count: 0, timer: 0, best: 0,
 // ============================== 맵 데이터 (§3.4 / §3.5) ==============================
 // 학교 본관은 tall:true (세로 스크롤 다층 + 계단), 그 외는 평면 맵(포탈/문 연결)
 const MAPS = {
-  // ---------- 튜토리얼: 학교 가는 길 (신규 시작 지점) ----------
-  gateway: {
-    name: "학교 가는 길 — 아르카나 언덕", w: 2400, theme: "forest",
+  // ========== Z1. 아르카나 언덕 (허브) — 언덕길·교정·시계탑이 하나로 ==========
+  campus: {
+    name: "아르카나 언덕 — 학교와 교정", w: 6200, h: 1560, ground: 1200, tall: true, theme: "campus",
     platforms: [
-      { x: 820,  y: 540, w: 150, h: 14 },   // 점프 연습
-      { x: 1430, y: 516, w: 190, h: 14 },   // 아래 점프 연습
+      // 주 지면 (전 구간) — 우물 구간은 아래점프 불가(포탈 이용)
+      { x: 0, y: 1200, w: 6200, h: 60, solidGround: true, base: true },
+      // 언덕길(튜토리얼) 연습 발판
+      { x: 820,  y: 1100, w: 150, h: 14 },
+      { x: 1430, y: 1076, w: 190, h: 14 },
+      // 지붕 정원 (본관 위 샛길)
+      { x: 2450, y: 860, w: 220, h: 14 },
+      { x: 2760, y: 780, w: 200, h: 14 },
+      { x: 3060, y: 860, w: 200, h: 14 },
+      // 시계탑 등반 (허브의 수직 챌린지)
+      { x: 4050, y: 1080, w: 150, h: 14 },
+      { x: 4260, y: 960,  w: 140, h: 14 },
+      { x: 4460, y: 840,  w: 140, h: 14 },
+      { x: 4260, y: 720,  w: 130, h: 14 },
+      { x: 4470, y: 600,  w: 130, h: 14 },
+      { x: 4260, y: 480,  w: 130, h: 14 },
+      { x: 4470, y: 360,  w: 130, h: 14 },
+      { x: 4240, y: 240,  w: 280, h: 16 },   // 시계탑 정상
     ],
     signs: [
       { x: 240,  text: "← → 키로 이동 — 언덕을 올라가자!" },
       { x: 700,  text: "Space 점프 — 발판을 뛰어넘자" },
       { x: 1150, text: "Shift 대시 — 바람처럼 달리기" },
       { x: 1560, text: "발판 위에서 ↓+Space — 사뿐히 내려서기" },
-      { x: 1900, text: "언덕 위에 마중 나온 학생이 보인다" },
-    ],
-    portals: [ { x: 2290, y: 640, to: "campus", tx: 190, ty: 640, label: "아르카나 아카데미 정문", door: true, tint: "#ffd27f" } ],
-    npcs: [
-      { kind: "friend", sid: "lina", name: "리나", x: 2060, lines: [
-        "정문은 바로 저기야! ↑ 키로 들어가면 돼.",
-        "본관 2층 교실에서 다시 만나자!" ] },
-    ],
-    mobs: [],
-  },
-
-  campus: {
-    name: "아르카나 아카데미 — 교정", w: 2760, theme: "campus",
-    platforms: [
-      { x: 900,  y: 532, w: 150, h: 14 },
-      { x: 1500, y: 500, w: 150, h: 14 },
-    ],
-    signs: [
-      { x: 250,  text: "아르카나 아카데미 — 교정" },
-      { x: 420,  text: "본관: ↑ 로 들어가 계단을 올라 교실로!" },
-      { x: 780,  text: "동아리 별관" },
-      { x: 1180, text: "훈련실은 본관 1F에! (본관 ↑)" },
-      { x: 1760, text: "마을 가는 길: ↑" },
-      { x: 2450, text: "관문: ↑ 입문의 숲" },
+      { x: 2130, text: "아르카나 아카데미 정문" },
+      { x: 3200, text: "학생 게시판 — 시계탑 출입 자유화! (단, 떨어져도 책임 안 짐)" },
+      { x: 2860, y: 780, text: "지붕 정원 — 바람이 잘 드는 낮잠 명소" },
+      { x: 4100, text: "시계탑 — 정상에서 숲 꼭대기로 건너갈 수 있다는 소문이…" },
+      { x: 4380, y: 240, text: "시계탑 정상 — 언덕과 숲, 바다가 한눈에 (고대 기록판: \"탑은 숲을 향해 인사한다\")" },
+      { x: 3640, text: "낡은 우물 — 두레박 줄이 어둠 속으로 한없이 이어져 있다" },
+      { x: 5900, text: "동쪽 관문 — 깊은 숲" },
     ],
     portals: [
-      { x: 100,  y: 640, to: "gateway", tx: 2230, ty: 640, label: "학교 가는 길", tint: "#c4b5fd" },
-      { x: 420,  y: 640, to: "school",  tx: 150, ty: 1240, label: "본관", door: true, tint: "#ffd27f" },
-      { x: 780,  y: 640, to: "clubroom", tx: 820, ty: 640, label: "동아리방", door: true, tint: "#a3e635" },
-      { x: 1760, y: 640, to: "road1",   tx: 150, ty: 640,  label: "마을 가는 길", tint: "#8be9fd" },
-      { x: 2500, y: 640, to: "forest",  tx: 180, ty: 640,  label: "입문의 숲" },
+      { x: 60,   y: 1200, to: "village",  tx: 5480, ty: 1000, label: "서쪽 내리막길 — 노을 해안", tint: "#f0abfc" },
+      { x: 2550, y: 1200, to: "school",   tx: 150,  ty: 1240, label: "본관", door: true, tint: "#ffd27f" },
+      { x: 2900, y: 1200, to: "clubroom", tx: 820,  ty: 640,  label: "동아리방", door: true, tint: "#a3e635" },
+      { x: 3640, y: 1200, to: "basement", tx: 600,  ty: 1340, label: "낡은 우물 ↓ (지하 미궁)", tint: "#4ade80", down: true },
+      { x: 4380, y: 240,  to: "forest",   tx: 420,  ty: 520,  label: "숲 꼭대기로 (건너뛰기!)", tint: "#8be9fd" },
+      { x: 6100, y: 1200, to: "forest",   tx: 170,  ty: 1500, label: "동쪽 관문 — 깊은 숲" },
     ],
-    npcs: [],
+    npcs: [
+      { kind: "friend", sid: "lina", name: "리나", x: 1980, lines: [
+        "정문은 바로 저기야! 본관 2층 교실에서 다시 만나자!",
+        "참, 시계탑이랑 우물엔 이상한 소문이 많아. …궁금하지 않아?" ] },
+    ],
     mobs: [],
   },
 
@@ -255,7 +259,7 @@ const MAPS = {
     ],
     // 복도의 문들 — 각 시설은 실제 방(별도 맵)
     portals: [
-      { x: 140,  y: 1240, to: "campus",     tx: 460, ty: 640,  label: "밖으로", door: true },
+      { x: 140,  y: 1240, to: "campus",     tx: 2550, ty: 1200, label: "밖으로", door: true },
       { x: 520,  y: 1240, to: "trainhall",  tx: 120, ty: 640,  label: "훈련실", door: true, tint: "#f59e0b" },
       { x: 660,  y: 1240, to: "shoproom",   tx: 820, ty: 640,  label: "매점", door: true, tint: "#fbbf24" },
       { x: 900,  y: 1240, to: "infirmary",  tx: 820, ty: 640,  label: "양호실", door: true, tint: "#8be9fd" },
@@ -267,7 +271,7 @@ const MAPS = {
       { x: 1100, y: 420,  to: "classadv",   tx: 820, ty: 640,  label: "고급 강의실", door: true, tint: "#64748b" },
     ],
     npcs: [
-      { kind: "info", name: "안내 데스크", x: 380, y: 1240, lines: [
+      { kind: "info", sid: "frontdesk", name: "안내 데스크", x: 380, y: 1240, lines: [
         "아르카나 아카데미에 온 걸 환영해요!",
         "각 시설은 복도의 문(↑)으로 들어갈 수 있어요.",
         "2층엔 강의실과 도서관, 3층엔 교장실과 고급 강의실이 있답니다.",
@@ -365,42 +369,96 @@ const MAPS = {
     name: "동아리 별관 — 마법 동아리방", w: 1000, theme: "school",
     platforms: [ { x: 620, y: 540, w: 140, h: 14 } ],
     signs: [ { x: 300, text: "마법 동아리 「불꽃 연구회」" } ],
-    portals: [ { x: 120, y: 640, to: "campus", tx: 780, ty: 640, label: "밖으로", door: true } ],
+    portals: [ { x: 120, y: 640, to: "campus", tx: 2900, ty: 1200, label: "밖으로", door: true } ],
     npcs: [ { kind: "club", name: "동아리 부장", x: 560, lines: [
       "어서 와, 여기가 우리 마법 동아리방이야!",
       "친목·서브 퀘스트… 동아리 활동은 곧 열릴 거야. 기대해!" ] } ],
     mobs: [],
   },
 
+  // ========== Z2. 깊은 숲 — 캐노피(상층) / 숲 바닥 / 심연(하층) ==========
   forest: {
-    name: "입문의 숲", w: 4400, theme: "forest",
+    name: "깊은 숲", w: 6800, h: 2260, ground: 1500, tall: true, theme: "forest",
     platforms: [
-      { x: 860,  y: 540, w: 170, h: 14 },
-      { x: 1100, y: 460, w: 170, h: 14 },
-      { x: 1340, y: 540, w: 170, h: 14 },
-      { x: 1750, y: 500, w: 200, h: 14 },
-      { x: 2050, y: 430, w: 200, h: 14 },
-      { x: 2600, y: 520, w: 180, h: 14 },
-      { x: 2880, y: 450, w: 180, h: 14 },
+      // 숲 바닥 (주 지면) — x4600~5000 구간은 ↓+Space로 심연 진입
+      { x: 0,    y: 1500, w: 4600, h: 60, solidGround: true, base: true },
+      { x: 4600, y: 1500, w: 400,  h: 60, solidGround: true },
+      { x: 5000, y: 1500, w: 1800, h: 60, solidGround: true, base: true },
+      // 심연 바닥 (하층)
+      { x: 4300, y: 2200, w: 2500, h: 60, solidGround: true, base: true },
+      // 구 뒷숲길 발판 (서쪽)
+      { x: 700,  y: 1380, w: 160, h: 14 },
+      { x: 1150, y: 1330, w: 160, h: 14 },
+      { x: 1600, y: 1380, w: 160, h: 14 },
+      // 사냥터 발판 (중앙)
+      { x: 3260, y: 1400, w: 170, h: 14 },
+      { x: 3500, y: 1320, w: 170, h: 14 },
+      { x: 3740, y: 1400, w: 170, h: 14 },
+      { x: 4150, y: 1360, w: 200, h: 14 },
+      { x: 4450, y: 1290, w: 200, h: 14 },
+      { x: 5000, y: 1380, w: 180, h: 14 },
+      { x: 5280, y: 1310, w: 180, h: 14 },
+      // 캐노피 (상층 — 나뭇가지 길)
+      { x: 260,  y: 520,  w: 220, h: 14 },
+      { x: 620,  y: 1150, w: 150, h: 14 },
+      { x: 900,  y: 1000, w: 150, h: 14 },
+      { x: 1180, y: 870,  w: 150, h: 14 },
+      { x: 1500, y: 750,  w: 160, h: 14 },
+      { x: 1850, y: 650,  w: 160, h: 14 },
+      { x: 2250, y: 560,  w: 170, h: 14 },
+      { x: 2700, y: 480,  w: 180, h: 14 },
+      { x: 3200, y: 420,  w: 200, h: 14 },
+      { x: 3750, y: 380,  w: 220, h: 14 },
+      { x: 4300, y: 420,  w: 200, h: 14 },
+      { x: 4850, y: 370,  w: 200, h: 14 },
+      { x: 5400, y: 320,  w: 260, h: 16 },   // 캐노피 동쪽 끝 (사당 자리)
+      { x: 700,  y: 640,  w: 150, h: 14 },   // 캐노피 서쪽 접근 사다리 발판
+    ],
+    stairs: [
+      { x0: 6750, y0: 1489, x1: 6350, y1: 2200 },   // 심연 → 숲 바닥 (지름길 계단)
     ],
     signs: [
-      { x: 340,  text: "입문의 숲 — 몬스터 주의!" },
-      { x: 1700, text: "X 누르고 있기: 화염구 차지 → 놓으면 발사!" },
-      { x: 3460, text: "전방: 학기말 실기 시험장!" },
-      { x: 4340, text: "1학기 수료!" },
+      { x: 300,  text: "깊은 숲 서쪽 어귀 — 몬스터 주의!" },
+      { x: 2740, text: "옛 사냥터 — 실습은 여기서!" },
+      { x: 4100, text: "X 누르고 있기: 화염구 차지 → 놓으면 발사!" },
+      { x: 4800, text: "경고: 이 아래는 심연 — 발판 위에서 ↓+Space (돌아오는 계단은 동쪽 끝)" },
+      { x: 5860, text: "전방: 학기말 실기 시험장!" },
+      { x: 6740, text: "1학기 수료!" },
+      { x: 370,  y: 520,  text: "숲 꼭대기 — 서쪽으로 시계탑이 보인다" },
+      { x: 3300, y: 420,  text: "고대 기록판: \"바람은 가장 높은 가지에만 머문다\"" },
+      { x: 5500, y: 320,  text: "바람의 사당 — 굳게 봉인되어 있다 (…언젠가 열릴 것 같다)" },
+      { x: 5600, y: 2200, text: "고대 기록판: \"이 숲의 뿌리는 학교보다 오래되었다\"" },
+      { x: 6500, y: 2200, text: "심연의 계단 — 위로" },
     ],
-    portals: [ { x: 110, to: "campus", tx: 2500, ty: 640, label: "교정" } ],
+    portals: [
+      { x: 170,  y: 1500, to: "campus",   tx: 6100, ty: 1200, label: "동쪽 관문 — 아르카나 언덕" },
+      { x: 420,  y: 520,  to: "campus",   tx: 4380, ty: 240,  label: "시계탑으로 (건너뛰기!)", tint: "#8be9fd" },
+      { x: 4400, y: 2200, to: "basement", tx: 4300, ty: 1340, label: "뿌리 동굴 — 지하 미궁", tint: "#4ade80" },
+    ],
+    npcs: [],
     mobs: [
-      ["slime", 1560, 1500, 1720], ["slime", 1840, 1760, 1980],
-      ["slime", 2120, 2020, 2260], ["slime", 2320, 2240, 2440],
-      ["mushroom", 2560, 2480, 2700], ["mushroom", 2820, 2740, 2960],
-      ["mushroom", 3080, 3000, 3220],
+      ["slime", 900, 800, 1050, 1500], ["slime", 1300, 1200, 1450, 1500],
+      ["mushroom", 1750, 1650, 1900, 1500],
+      ["slime", 3960, 3900, 4120, 1500], ["slime", 4240, 4160, 4380, 1500],
+      ["slime", 4520, 4420, 4660, 1500], ["slime", 4720, 4640, 4840, 1500],
+      ["mushroom", 4960, 4880, 5100, 1500], ["mushroom", 5220, 5140, 5360, 1500],
+      ["mushroom", 5480, 5400, 5620, 1500],
+      ["bat", 4800, 4600, 5050, 1930], ["bat", 5400, 5200, 5650, 1880],
+      ["bat", 6000, 5800, 6250, 1950],
     ],
   },
 
+  // ========== Z3. 지하 미궁 — 상층(학교 지하실) + 하층(카타콤: 세계의 교차로) ==========
   basement: {
-    name: "학교 지하실", w: 3400, theme: "basement",
+    name: "지하 미궁", w: 4800, h: 2060, ground: 640, tall: true, theme: "basement",
     platforms: [
+      // 상층 바닥 — x2600~2900 구간은 ↓+Space로 카타콤 진입
+      { x: 0,    y: 640, w: 2600, h: 60, solidGround: true },
+      { x: 2600, y: 640, w: 300,  h: 60, solidGround: true },
+      { x: 2900, y: 640, w: 1900, h: 60, solidGround: true },
+      // 하층 카타콤 바닥
+      { x: 300,  y: 1340, w: 4500, h: 60, solidGround: true, base: true },
+      // 기존 지하실 발판 (상층)
       { x: 20,   y: 210, w: 360, h: 14 },
       { x: 380,  y: 275, w: 130, h: 14 },
       { x: 510,  y: 340, w: 130, h: 14 },
@@ -413,98 +471,124 @@ const MAPS = {
       { x: 1560, y: 560, w: 210, h: 14 },
       { x: 1900, y: 470, w: 160, h: 14 },
       { x: 2150, y: 380, w: 150, h: 14 },
-      { x: 2130, y: 585, w: 190, h: 14 },
       { x: 2400, y: 300, w: 150, h: 14 },
       { x: 2440, y: 500, w: 170, h: 14 },
       { x: 2700, y: 420, w: 160, h: 14 },
       { x: 2950, y: 520, w: 180, h: 14 },
+      // 확장 통로 (상층 동쪽)
+      { x: 3550, y: 540, w: 170, h: 14 },
+      { x: 3850, y: 460, w: 170, h: 14 },
+      { x: 4150, y: 540, w: 170, h: 14 },
+      // 카타콤 발판 (하층)
+      { x: 1100, y: 1200, w: 160, h: 14 },
+      { x: 2050, y: 1180, w: 180, h: 14 },
+      { x: 3300, y: 1200, w: 160, h: 14 },
     ],
-    signs: [ { x: 200, text: "학교 지하실 — 관계자 외 출입 금지" } ],
-    portals: [ { x: 90, y: 210, to: "school", tx: 1120, ty: 1240, label: "↑ 본관으로", tint: "#8b5cf6" } ],
-    torches: [ 200, 640, 1150, 1650, 2150, 2650, 3080 ],
+    stairs: [
+      { x0: 2250, y0: 629, x1: 1750, y1: 1340 },   // 상층 ↔ 카타콤 대계단
+    ],
+    signs: [
+      { x: 200, text: "학교 지하실 — 관계자 외 출입 금지" },
+      { x: 2750, text: "주의: 바닥이 무너져 있다 — ↓+Space (아래: 카타콤)" },
+      { x: 4600, text: "고대 기록판: \"문이 잠든 곳, 세 갈래 길이 만난다\"" },
+      { x: 600,  y: 1340, text: "우물 밑바닥 — 위에서 희미한 빛이 새어 든다" },
+      { x: 1500, y: 1340, text: "고대 기록판: \"우리는 학교가 세워지기 전부터 이 길을 걸었다\"" },
+      { x: 2200, y: 1340, text: "카타콤 대계단 — 위로" },
+      { x: 3000, y: 1340, text: "고대 기록판: \"뿌리는 바다를 향해, 바다는 불을 향해\"" },
+      { x: 4050, y: 1340, text: "물소리가 들린다 — 마을 우물 방향" },
+    ],
+    portals: [
+      { x: 90,   y: 210,  to: "school",  tx: 1120, ty: 1240, label: "↑ 본관으로", tint: "#8b5cf6" },
+      { x: 600,  y: 1340, to: "campus",  tx: 3640, ty: 1200, label: "우물 위로 ↑ (교정)", tint: "#4ade80" },
+      { x: 4000, y: 1340, to: "village", tx: 4800, ty: 1000, label: "마을 우물 ↑ (노을 해안)", tint: "#7dd3fc" },
+      { x: 4300, y: 1340, to: "forest",  tx: 4400, ty: 2200, label: "뿌리 동굴 — 깊은 숲 심연", tint: "#5fd068" },
+    ],
+    torches: [ 200, 640, 1150, 1650, 2150, 2650, 3080, 3600, 4200 ],
     door: { x: 3230 },
     mobs: [
       ["bat", 1500, 1300, 1720, 380],
       ["bat", 2050, 1880, 2280, 300],
       ["bat", 2600, 2380, 2860, 360],
       ["bat", 3060, 2900, 3200, 290],
+      ["bat", 3900, 3700, 4100, 400],
+      ["bat", 1400, 1200, 1650, 1080],
+      ["bat", 2600, 2400, 2850, 1120],
+      ["bat", 3600, 3400, 3850, 1060],
     ],
   },
 
-  road1: {
-    name: "학교 뒷숲 — 마을 가는 길", w: 2400, theme: "forest",
-    platforms: [
-      { x: 700, y: 520, w: 160, h: 14 },
-      { x: 1150, y: 470, w: 160, h: 14 },
-      { x: 1600, y: 520, w: 160, h: 14 },
-    ],
-    signs: [
-      { x: 300,  text: "학교 뒷숲 — 마을 가는 길" },
-      { x: 2150, text: "여명 마을 성문이 보인다" },
-    ],
-    portals: [
-      { x: 110,  y: 640, to: "campus",  tx: 1760, ty: 640, label: "교정" },
-      { x: 2300, y: 640, to: "village", tx: 150,  ty: 640, label: "여명 마을" },
-    ],
-    mobs: [
-      ["slime", 900, 800, 1050], ["slime", 1300, 1200, 1450],
-      ["mushroom", 1750, 1650, 1900],
-    ],
-  },
-
+  // ========== Z4. 노을 해안 — 항구(서쪽 바다) + 여명 마을(동쪽) + 절벽길·등대 ==========
   village: {
-    name: "여명 마을", w: 2600, theme: "town",
-    platforms: [ { x: 1250, y: 520, w: 160, h: 14 } ],
+    name: "노을 해안 — 여명 마을과 소금바람 항구", w: 5600, h: 1400, ground: 1000, tall: true, theme: "coast",
+    platforms: [
+      { x: 0, y: 1000, w: 5600, h: 60, solidGround: true, base: true },
+      // 항구 창고 지붕 (서쪽)
+      { x: 900,  y: 880, w: 200, h: 14 },
+      // 절벽길 (상층) — 등대까지
+      { x: 300,  y: 560, w: 240, h: 16 },   // 등대 발치
+      { x: 700,  y: 640, w: 170, h: 14 },
+      { x: 1100, y: 700, w: 170, h: 14 },
+      { x: 1550, y: 640, w: 170, h: 14 },
+      { x: 2050, y: 700, w: 170, h: 14 },
+      { x: 2550, y: 640, w: 180, h: 14 },
+      { x: 3050, y: 700, w: 180, h: 14 },
+      { x: 3500, y: 780, w: 180, h: 14 },
+      { x: 3950, y: 860, w: 180, h: 14 },
+      // 마을 지붕 샛길 (동쪽)
+      { x: 4450, y: 880, w: 160, h: 14 },
+    ],
     signs: [
-      { x: 300,  text: "여명 마을 — 학교 앞 작은 마을" },
-      { x: 700,  text: "여관" },
-      { x: 1100, text: "잡화점" },
-      { x: 1500, text: "마을 게시판" },
+      { x: 200,  text: "소금바람 항구 — 바다 끝엔 무엇이 있을까" },
+      { x: 1850, text: "출항 안내: 불의 마을행 — 선원에게 문의" },
+      { x: 420,  y: 560, text: "등대 — 고대 기록판: \"바다 건너의 불은 등불이 아니라 심장이다\"" },
+      { x: 2600, y: 640, text: "절벽길 — 노을이 가장 잘 보이는 곳" },
+      { x: 3300, text: "여명 마을 — 학교 앞 작은 마을" },
+      { x: 3500, text: "여관" },
+      { x: 3900, text: "잡화점" },
+      { x: 4300, text: "마을 게시판 — \"우물에서 이상한 소리가 들려요\"" },
+      { x: 4800, text: "마을 우물 — 두레박이 끊어져 있다" },
     ],
     portals: [
-      { x: 110,  y: 640, to: "road1",  tx: 2300, ty: 640, label: "마을 가는 길" },
-      { x: 2450, y: 640, to: "harbor", tx: 150,  ty: 640, label: "소금바람 항구", door: true, tint: "#7dd3fc" },
+      { x: 4800, y: 1000, to: "basement", tx: 4000, ty: 1340, label: "마을 우물 ↓ (지하 미궁)", tint: "#4ade80", down: true },
+      { x: 5540, y: 1000, to: "campus",  tx: 130,  ty: 1200, label: "동쪽 오르막길 — 아르카나 언덕", tint: "#c4b5fd" },
     ],
-    npcs: [
-      { kind: "heal", sid: "inn", name: "여관 주인", x: 700, lines: [
-        "여명 여관입니다. 푹 쉬고 가세요 — 체력과 마나를 회복해 드릴게요." ] },
-      { kind: "shop", sid: "grocer", name: "잡화 상인", x: 1100, lines: [
-        "여명 잡화점입니다! …상점 기능은 준비 중이에요.", "곧 좋은 물건 들여올게요." ] },
-      { kind: "info", name: "마을 주민", x: 1500, lines: [
-        "항구 쪽으로 가면 바다를 볼 수 있어요.", "언젠가 저 배로 먼 대륙에도 갈 수 있다던데…" ] },
-    ],
-    mobs: [],
-  },
-
-  harbor: {
-    name: "소금바람 항구", w: 2200, theme: "harbor",
-    platforms: [ { x: 900, y: 520, w: 200, h: 14 } ],
-    signs: [
-      { x: 300,  text: "소금바람 항구" },
-      { x: 1850, text: "출항 준비 중…" },
-    ],
-    portals: [ { x: 110, y: 640, to: "village", tx: 2450, ty: 640, label: "여명 마을" } ],
     npcs: [
       { kind: "sailor", name: "선원", x: 900 },
+      { kind: "heal", sid: "inn", name: "여관 주인", x: 3500, lines: [
+        "여명 여관입니다. 푹 쉬고 가세요 — 체력과 마나를 회복해 드릴게요." ] },
+      { kind: "shop", sid: "grocer", name: "잡화 상인", x: 3900, lines: [
+        "여명 잡화점입니다! …상점 기능은 준비 중이에요.", "곧 좋은 물건 들여올게요." ] },
+      { kind: "info", name: "마을 주민", x: 4300, lines: [
+        "절벽길을 따라가면 등대가 나와요. 노을이 정말 예쁘죠.",
+        "우물이요? …밤마다 이상한 소리가 들려서 아무도 안 내려가요." ] },
     ],
     mobs: [],
   },
 
   // ---------- 불의 마을 (고급 마법 제2식 「멸화」 퀘스트) ----------
   firevil: {
-    name: "불의 마을 — 화산 기슭", w: 3200, theme: "volcano",
+    name: "불의 마을 — 화산 기슭", w: 3400, h: 1760, ground: 1200, tall: true, theme: "volcano",
     platforms: [
-      { x: 780,  y: 520, w: 170, h: 14 },
-      { x: 1180, y: 460, w: 170, h: 14 },
-      { x: 1600, y: 520, w: 190, h: 14 },
-      { x: 2120, y: 470, w: 190, h: 14 },
+      { x: 0, y: 1200, w: 3400, h: 60, solidGround: true, base: true },
+      { x: 780,  y: 1080, w: 170, h: 14 },
+      { x: 1180, y: 1020, w: 170, h: 14 },
+      { x: 1600, y: 1080, w: 190, h: 14 },
+      { x: 2120, y: 1030, w: 190, h: 14 },
+      // 화구 등반 (상층)
+      { x: 2560, y: 960, w: 150, h: 14 },
+      { x: 2820, y: 840, w: 150, h: 14 },
+      { x: 3080, y: 720, w: 150, h: 14 },
+      { x: 2900, y: 580, w: 150, h: 14 },
+      { x: 3130, y: 460, w: 240, h: 16 },   // 화구 능선
     ],
     signs: [
       { x: 320,  text: "불의 마을 — 살아있는 화산의 기슭" },
       { x: 1000, text: "경고: 화산 정상엔 화염 군주가 잠들어 있다" },
       { x: 2500, text: "분화구 — 화염 군주 이그니스의 둥지" },
+      { x: 2650, y: 960, text: "화구 등반로 — 발밑 조심!" },
+      { x: 3250, y: 460, text: "화구 능선 — 이글거리는 흑요암이 길을 막는다 (평범한 불로는 어림도 없다…)" },
     ],
-    portals: [ { x: 150, y: 640, to: "harbor", tx: 900, ty: 640, label: "항구로 (배)", tint: "#7dd3fc", door: true } ],
+    portals: [ { x: 150, y: 1200, to: "village", tx: 900, ty: 1000, label: "항구로 (배)", tint: "#7dd3fc", door: true } ],
     npcs: [
       { kind: "info", name: "화산지기", x: 500, lines: [
         "바다 건너 여기까지 오다니… 대마도사님이 보낸 아이로군.",
@@ -514,13 +598,14 @@ const MAPS = {
         "화상은 이 몸에게 맡기렴. 몸도 마나도 다시 채워주마." ] },
     ],
     mobs: [
-      ["ember", 1350, 1200, 1550], ["ember", 1750, 1600, 1950], ["ember", 2200, 2050, 2350],
-      ["firelord", 2700, 2700, 2700],
+      ["ember", 1350, 1200, 1550, 1200], ["ember", 1750, 1600, 1950, 1200], ["ember", 2200, 2050, 2350, 1200],
+      ["firelord", 2700, 2700, 2700, 1200],
     ],
   },
 };
 
 let curMapId = "campus";
+let mapGroundY = GROUND_Y;   // 현재 맵의 '주 지면' 높이 (존마다 다름)
 let mapW = MAPS.campus.w, mapH = VIEW_H, mapTheme = "campus", mapTall = false;
 let platforms = [], stairs = [], signs = [], portals = [], npcs = [];
 let mapTorches = [], mapDoor = null;
@@ -528,7 +613,7 @@ let doorTalks = 0;
 
 // 배경 나무(숲 테마) — 결정적 배치
 const bgTrees = [];
-for(let i=0;i<34;i++){
+for(let i=0;i<54;i++){
   bgTrees.push({ x: 60 + i*130 + (i*97 % 50), h: 180 + (i*53 % 120), layer: i%2 });
 }
 
@@ -542,11 +627,12 @@ function loadMap(id, spawnX, spawnY){
   const M = MAPS[id];
   curMapId = id;
   mapW = M.w; mapH = M.h || VIEW_H; mapTheme = M.theme; mapTall = !!M.tall;
+  mapGroundY = M.ground ?? GROUND_Y;
   // 평면 맵은 바닥 자동 추가, 다층(tall) 맵은 자체 층(solidGround) 사용
-  platforms = M.tall ? [...M.platforms] : [{ x: 0, y: GROUND_Y, w: M.w, h: 80, solidGround: true, base: true }, ...M.platforms];
+  platforms = M.tall ? [...M.platforms] : [{ x: 0, y: mapGroundY, w: M.w, h: 80, solidGround: true, base: true }, ...M.platforms];
   stairs = M.stairs || [];
   signs = M.signs || []; portals = M.portals || [];
-  npcs = (M.npcs || []).map(n => ({ ...n, y: n.y ?? GROUND_Y }));
+  npcs = (M.npcs || []).map(n => ({ ...n, y: n.y ?? mapGroundY }));
   mapTorches = M.torches || [];
   mapDoor = M.door || null;
   // 몬스터 리스폰 (일회성 보스 제외)
@@ -554,7 +640,7 @@ function loadMap(id, spawnX, spawnY){
   BOSS_M = null;
   for(const md of (M.mobs || [])) spawnMob(md[0], md[1], md[2], md[3], md[4]);
   if(id === "forest"){
-    spawnMob("boss", 4100, 4100, 4100);
+    spawnMob("boss", 6500, 6500, 6500, MAPS.forest.ground);
     BOSS_M = monsters[monsters.length - 1];
     if(boss.defeated){ BOSS_M.dead = true; BOSS_M.respawn = Infinity; }
     boss.active = false; boss.state = "wait"; boss.t = 1.2;
@@ -566,7 +652,7 @@ function loadMap(id, spawnX, spawnY){
   dialog = null; learnUI = null;   // 맵 전환 시 잔류 대화/학습창 방지 (예: 대화 중 사망)
   particles.length = 0; dmgNumbers.length = 0; floatTexts.length = 0;
   player.x = clamp(spawnX, P.w/2, mapW - P.w/2);
-  player.y = spawnY ?? GROUND_Y; player.vx = 0; player.vy = 0;
+  player.y = spawnY ?? mapGroundY; player.vx = 0; player.vy = 0;
   camX = clamp(player.x - VIEW_W/2, 0, Math.max(0, mapW - VIEW_W));
   camY = clamp(player.y - VIEW_H*0.62, 0, Math.max(0, mapH - VIEW_H));
   addFloatText(player.x, player.y - 130, M.name, "#8be9fd");
@@ -664,11 +750,14 @@ const QUESTS = [
     lines:[ "야! 너지? 오늘 입학하는 신입생!  난 리나 — 같은 반이 될 거야.",
             "아르카나 아카데미에 온 걸 환영해! 여기서부턴 내가 안내해 줄게.",
             "정문은 바로 저 앞이야. ↑ 키로 문을 지나면 교정이 나와. 가자!" ] },
-  { name:"교문을 지나",    desc:"정문(↑)을 지나 아르카나 아카데미 교정으로", type:"visit", target:"campus", need:1,
+  { name:"등교",          desc:"정문을 지나 교정의 본관(↑)으로 들어가기", type:"visit", target:"school", need:1,
     rewards:[], exp:10 },
   // ---------- 6~15 입학 오리엔테이션 ----------
-  { name:"본관 로비",      desc:"교정의 본관(↑)으로 들어가기", type:"visit", target:"school", need:1,
-    rewards:[], exp:10 },
+  { name:"본관 로비",      desc:"로비의 안내 데스크에 인사하기", type:"talk", target:"frontdesk", need:1,
+    rewards:[], exp:10,
+    lines:[ "아르카나 아카데미에 온 걸 환영해요, 신입생!",
+            "각 시설은 복도의 문(↑)으로, 위층은 계단으로 올라가요.",
+            "담임 아그니스 교수님이 2층 초급 강의실에서 기다리세요!" ] },
   { name:"담임 선생님",    desc:"2층 초급 강의실의 담임 아그니스 교수와 대면", type:"talk", target:"agnis", need:1,
     rewards:[["wil","소"]], exp:15,
     lines:[ "오, 자네가 새 얼굴이군. 난 아그니스 — 자네 반 담임이자 초급 화염술 담당이다.",
@@ -737,8 +826,8 @@ const QUESTS = [
     lines:[ "첫 마법 축하해! …그런데 있잖아, 부탁 하나만 해도 될까?",
             "어제 입문의 숲에서 목걸이를 떨어뜨렸어. 엄마가 주신 건데…",
             "숲 안쪽 어딘가일 거야. 반짝이는 게 보이면 그거야! 부탁해!" ] },
-  { name:"잃어버린 목걸이", desc:"입문의 숲에서 리나의 목걸이 찾기 (E)", type:"inspect", target:"necklace", need:1,
-    spot:{ map:"forest", x:2450, label:"리나의 목걸이" },
+  { name:"잃어버린 목걸이", desc:"깊은 숲 사냥터 부근에서 리나의 목걸이 찾기 (E)", type:"inspect", target:"necklace", need:1,
+    spot:{ map:"forest", x:4850, label:"리나의 목걸이" },
     rewards:[["agi","소"]], exp:25,
     lines:[ "수풀 사이에서 은빛 목걸이를 주웠다.",
             "작은 불꽃 모양 펜던트가 달려 있다 — 리나의 것이 분명하다." ] },
@@ -755,14 +844,14 @@ const QUESTS = [
   { name:"화염구 각인 실습", desc:"「화염구」 수업 이수 — MAX 차지 3회 명중", type:"lesson", target:"fireball", need:1,
     rewards:[["mag","중"]], exp:50 },
   // ---------- 26~31 화염 장판 아크: 숲 정리 → 테오 → 이론 → 실습 ----------
-  { name:"숲 정리",        desc:"입문의 숲 슬라임 5마리 처치", type:"kill", target:"slime", need:5,
+  { name:"숲 정리",        desc:"깊은 숲 슬라임 5마리 처치", type:"kill", target:"slime", need:5,
     rewards:[["agi","중"],["str","소"]], exp:45 },
   { name:"테오의 고민",    desc:"교실의 테오와 대화하기", type:"talk", target:"theo", need:1,
     rewards:[], exp:15,
     lines:[ "저기… 부탁이 있어. 숲의 주황버섯 말이야…",
             "실습 시간에 걔들한테 쫓겨 다닌 뒤로 숲에 못 들어가겠어…",
             "네가 몇 마리만 줄여 주면, 나도 다시 실습 나갈 수 있을 것 같아. 부, 부탁해!" ] },
-  { name:"버섯 소탕",      desc:"입문의 숲 주황버섯 3마리 처치", type:"kill", target:"mushroom", need:3,
+  { name:"버섯 소탕",      desc:"깊은 숲 주황버섯 3마리 처치", type:"kill", target:"mushroom", need:3,
     rewards:[["vit","중"],["str","소"]], exp:60 },
   { name:"테오의 미소",    desc:"테오에게 소식 전하기", type:"talk", target:"theo", need:1,
     rewards:[["wil","중"]], exp:25,
@@ -777,7 +866,7 @@ const QUESTS = [
   { name:"화염 장판 각인 실습", desc:"「화염 장판」 수업 이수 — 장판으로 20회 타격", type:"lesson", target:"field", need:1,
     rewards:[["mag","대"],["wil","중"]], exp:70 },
   // ---------- 32 학기말 실기 시험 ----------
-  { name:"학기말 실기 시험", desc:"입문의 숲 끝 시험장 — 숲의 수호자 격파", type:"kill", target:"boss", need:1,
+  { name:"학기말 실기 시험", desc:"깊은 숲 동쪽 끝 시험장 — 숲의 수호자 격파", type:"kill", target:"boss", need:1,
     rewards:[["mag","특대"],["vit","대"],["str","중"]], exp:200 },
   // ---------- 33~38 중급 랜스 아크: 입학 → 추천서 → 마을 심부름 → 이론 → 실습 ----------
   { name:"중급 과정 입학",  desc:"2층 중급 강의실 이그니아 교수와 대면", type:"talk", target:"ignia", need:1,
@@ -790,7 +879,7 @@ const QUESTS = [
     lines:[ "수호자를 이겼다지? 훌륭하군. 추천서는 여기 있네.",
             "…한 가지 부탁이 있어. 여명 마을 여관에 이 소포를 전해 주게.",
             "오래된 친구에게 보내는 물건일세. 마을 구경도 할 겸, 다녀오게나." ] },
-  { name:"여명 마을로",    desc:"교정 → 뒷숲 길을 지나 여명 마을 방문", type:"visit", target:"village", need:1,
+  { name:"여명 마을로",    desc:"언덕 서쪽 내리막길로 노을 해안(여명 마을) 방문", type:"visit", target:"village", need:1,
     rewards:[["agi","소"]], exp:30 },
   { name:"여관 소포 전달", desc:"여명 여관 주인에게 교장의 소포 전달", type:"talk", target:"inn", need:1,
     rewards:[["wil","중"]], exp:40,
@@ -810,7 +899,7 @@ const QUESTS = [
     lines:[ "오, 학교 학생! 마침 잘 왔어요.",
             "슬라임 젤리가 동났지 뭐예요. 물약 재료인데 말이죠.",
             "숲 슬라임 5마리만 잡아다 주면 — 사례는 톡톡히 할게요!" ] },
-  { name:"슬라임 젤리",    desc:"잡화점을 위해 숲 슬라임 5마리 처치", type:"kill", target:"slime", need:5,
+  { name:"슬라임 젤리",    desc:"잡화점을 위해 깊은 숲 슬라임 5마리 처치", type:"kill", target:"slime", need:5,
     rewards:[["str","중"]], exp:60 },
   { name:"젤리 전달",      desc:"잡화 상인에게 돌아가기", type:"talk", target:"grocer", need:1,
     rewards:[["vit","중"]], exp:40,
@@ -838,7 +927,7 @@ const QUESTS = [
   // ---------- 49~53 고급 제2식: 불의 마을 체인 ----------
   { name:"붉은 편지",      desc:"대마도사에게 제2식 「멸화」에 대해 듣기 (고급 강의실)", type:"talk", target:"master2", need:1,
     rewards:[["wil","대"]], exp:200 },
-  { name:"불의 마을로",    desc:"소금바람 항구에서 배를 타고 '불의 마을'로 건너가기", type:"talk", target:"sailor", need:1,
+  { name:"불의 마을로",    desc:"노을 해안 항구에서 배를 타고 '불의 마을'로 건너가기", type:"talk", target:"sailor", need:1,
     rewards:[["agi","중"]], exp:150 },
   { name:"화산의 시련",    desc:"불의 마을 화산 기슭에서 「화염 군주 이그니스」 격파", type:"kill", target:"firelord", need:1,
     rewards:[["str","대"],["vit","대"],["mag","대"]], exp:600 },
@@ -1111,7 +1200,7 @@ function talkToSailor(n){
   startDialog([
     "오, 대마도사님의 배편이 자네였군! 준비는 됐네.",
     "저 너머 '불의 마을'로 데려다주지. …화산이라 뜨거우니 각오하게!",
-  ], ()=>{ questEvent("talk", "sailor"); startTransition("firevil", 240, GROUND_Y); }, n.name);
+  ], ()=>{ questEvent("talk", "sailor"); startTransition("firevil", 240, MAPS.firevil.ground ?? GROUND_Y); }, n.name);
 }
 
 // ============================== 수업 선택 창 (학생 수첩식) ==============================
@@ -1245,8 +1334,8 @@ function pickupTome(){
   ], ()=>{
     questEvent("inspect", "tome");
     juice.addShake(0.5); juice.flash = Math.max(juice.flash, 0.4);
-    spawnParticles(3100, GROUND_Y - 50, { n: 30, col: ["#ff5060","#ff8080","#b45cff"], sp0: 80, sp1: 320, l0: .3, l1: .8, add: true, grav: -60 });
-    if(mapDoor) spawnParticles(mapDoor.x, GROUND_Y - 90, { n: 24, col: ["#9d5cff","#7c3aed"], sp0: 60, sp1: 260, l0: .3, l1: .8, add: true });
+    spawnParticles(3100, mapGroundY - 50, { n: 30, col: ["#ff5060","#ff8080","#b45cff"], sp0: 80, sp1: 320, l0: .3, l1: .8, add: true, grav: -60 });
+    if(mapDoor) spawnParticles(mapDoor.x, mapGroundY - 90, { n: 24, col: ["#9d5cff","#7c3aed"], sp0: 60, sp1: 260, l0: .3, l1: .8, add: true });
     addFloatText(player.x, player.y - 96, "『홍염의 서』를 손에 넣었다!", "#ff6b6b");
     saveGame();
   }, "『홍염의 서』");
@@ -1260,7 +1349,7 @@ function pickupEmber(){
     player.hasEmber = true;
     questEvent("inspect", "ember");
     juice.addShake(0.5); juice.flash = Math.max(juice.flash, 0.45);
-    spawnParticles(player.x, GROUND_Y - 40, { n: 34, col: ["#ff5030","#ffb35c","#ffe08a","#fff"], sp0: 90, sp1: 360, l0: .3, l1: .8, add: true, grav: -50 });
+    spawnParticles(player.x, mapGroundY - 40, { n: 34, col: ["#ff5030","#ffb35c","#ffe08a","#fff"], sp0: 90, sp1: 360, l0: .3, l1: .8, add: true, grav: -50 });
     addFloatText(player.x, player.y - 96, "『멸화의 불씨』를 손에 넣었다!", "#ff8040");
     saveGame();
   }, "『멸화의 불씨』");
@@ -1281,7 +1370,7 @@ function talkToDoor(){
   const lines = sets[doorTalks % sets.length];
   doorTalks++;
   juice.addShake(0.06);
-  spawnParticles(mapDoor.x, GROUND_Y - 80, { n: 10, col: ["#b45cff","#7c3aed","#4ade80"], sp0: 20, sp1: 90, l0: .4, l1: .9, add: true, grav: -30 });
+  spawnParticles(mapDoor.x, mapGroundY - 80, { n: 10, col: ["#b45cff","#7c3aed","#4ade80"], sp0: 20, sp1: 90, l0: .4, l1: .9, add: true, grav: -30 });
   startDialog(lines, null, "의문의 문");
 }
 
@@ -1293,7 +1382,7 @@ function castField(){
   pl.fieldCd = SKILL.field.cd;
   pl.mp -= SKILL.field.mp;
   pl.castT = 0.2;
-  const fy = pl.onGround ? pl.y : GROUND_Y;
+  const fy = pl.onGround ? pl.y : mapGroundY;
   fields.push({ x: pl.x + pl.facing * 90, y: fy, t: 0, tickT: 0,
     w: SKILL.field.width + 26 * (lv - 1),           // 레벨당 폭 확장
     dur: SKILL.field.dur + 0.4 * (lv - 1), tier });
@@ -1426,7 +1515,7 @@ let saveTimer = 8, saveFlash = 0, resetArm = 0;
 function saveGame(){
   try{
     localStorage.setItem(SAVE_KEY, JSON.stringify({
-      v: 3, qv: 2, level: player.level, exp: player.exp, stats: player.stats,
+      v: 3, qv: 3, level: player.level, exp: player.exp, stats: player.stats,
       skills: player.skills, skillLv: player.skillLv, hasEmber: player.hasEmber,
       quest: { idx: questState.idx, prog: Math.floor(questState.prog), doneAll: questState.doneAll },
       teachers: Object.fromEntries(TEACHERS.map(t=>[t.id, teacherState[t.id]])),
@@ -1446,7 +1535,7 @@ function loadGame(){
     if(d.skillLv) Object.assign(player.skillLv, d.skillLv);
     player.hasEmber = !!d.hasEmber;
     if(d.bossDefeated) boss.defeated = true;   // pd() 판정 전에 먼저 로드
-    if(d.qv === 2){
+    if(d.qv >= 2){
       // 현행 퀘스트 체인 세이브 — 그대로 신뢰
       questState.idx = clamp((d.quest && d.quest.idx) || 0, 0, QUESTS.length);
       questState.prog = (d.quest && d.quest.prog) || 0;
@@ -1476,8 +1565,15 @@ function loadGame(){
       if(st.learning && (player.skills[st.learning] || !t.lessons.some(l => l.skill === st.learning))){ st.learning = null; st.prog = 0; }
     }
     combo.best = d.best || 0;
-    const mid = MAPS[d.map] ? d.map : "campus";
-    loadMap(mid, d.x ?? 520, d.y);
+    // 월드 개편(v0.15) 마이그레이션: 구 맵 → 신규 존 좌표
+    let mid = d.map, mx = d.x ?? 520, my = d.y;
+    if((d.qv || 0) < 3){
+      const MOVED = { gateway:["campus",0], road1:["forest",0], harbor:["village",0],
+                      campus:["campus",2130], forest:["forest",2400], village:["village",2800], firevil:["firevil",0] };
+      if(MOVED[mid]){ const [nm, dx] = MOVED[mid]; mid = nm; mx = mx + dx; my = undefined; }
+    }
+    if(!MAPS[mid]){ mid = "campus"; mx = 2400; my = undefined; }
+    loadMap(mid, mx, my);
     player.hp = maxHp(); player.mp = maxMp();
     addFloatText(player.x, player.y - 110, "이어하기 — 저장 데이터 불러옴", "#8be9fd");
   }catch(e){}
@@ -1581,7 +1677,7 @@ function updatePlayer(dt){
     }else if(!boss.defeated && !bossReady()){
       if(pl.x > GATE_X - 24){
         pl.x = GATE_X - 24;
-        if(Math.random() < 0.02) addFloatText(GATE_X - 60, GROUND_Y - 120, "남은 퀘스트를 완료하면 시험장이 열린다", "#f0abfc");
+        if(Math.random() < 0.02) addFloatText(GATE_X - 60, mapGroundY - 120, "남은 퀘스트를 완료하면 시험장이 열린다", "#f0abfc");
       }
     }
   }
@@ -1888,7 +1984,7 @@ function explodeFireball(pr){
 const monsters = [];
 function spawnMob(type, x, patrolMin, patrolMax, y){
   const d = MOB_DEFS[type];
-  const by = y ?? GROUND_Y;
+  const by = y ?? mapGroundY;
   monsters.push({
     type, x, y: by, baseY: by, vx: 0, dir: Math.random()<0.5?-1:1,
     hp: d.hp, maxHp: d.hp,
@@ -1945,7 +2041,7 @@ function updateMonsters(dt){
       if(!m.onGround){
         m.vy += GRAV * dt;
         m.y += m.vy * dt;
-        if(m.y >= GROUND_Y){ m.y = GROUND_Y; m.vy = 0; m.onGround = true; }
+        if(m.y >= m.baseY){ m.y = m.baseY; m.vy = 0; m.onGround = true; }
       }
     }
     m.x = clamp(m.x, 40, mapW - 40);
@@ -2091,11 +2187,11 @@ function updateSpikes(dt){
       if(s.warn <= 0){
         s.active = 0.45;
         juice.addShake(0.22);
-        spawnParticles(s.x, GROUND_Y, { n: 10, col: ["#7a9b5e","#4a6741","#8a683d"], sp0: 60, sp1: 240, l0: .2, l1: .5, grav: 500 });
+        spawnParticles(s.x, mapGroundY, { n: 10, col: ["#7a9b5e","#4a6741","#8a683d"], sp0: 60, sp1: 240, l0: .2, l1: .5, grav: 500 });
       }
     }else{
       s.active -= dt;
-      if(s.active > 0.12 && !player.dead && Math.abs(player.x - s.x) < 46 && player.y > GROUND_Y - 72){
+      if(s.active > 0.12 && !player.dead && Math.abs(player.x - s.x) < 46 && player.y > mapGroundY - 72){
         hurtPlayer(15, s.x + (player.x < s.x ? 40 : -40));
       }
       if(s.active <= 0) spikes.splice(i, 1);
@@ -2108,7 +2204,7 @@ function throwSeeds(n){
     const tx = player.x + rand(-70, 70);
     const t0 = rand(0.75, 1.05);
     const sx = m.x, sy = m.y - 92;
-    eprojs.push({ x: sx, y: sy, vx: (tx - sx)/t0, vy: (GROUND_Y - sy - 0.5*GRAV*t0*t0)/t0, r: 9 });
+    eprojs.push({ x: sx, y: sy, vx: (tx - sx)/t0, vy: (mapGroundY - sy - 0.5*GRAV*t0*t0)/t0, r: 9 });
   }
 }
 function updateEprojs(dt){
@@ -2120,8 +2216,8 @@ function updateEprojs(dt){
       hurtPlayer(12, e.x - sign(e.vx) * 30);
       eprojs.splice(i, 1); continue;
     }
-    if(e.y >= GROUND_Y){
-      spawnParticles(e.x, GROUND_Y, { n: 6, col: ["#7a9b5e","#a3e635"], sp0: 40, sp1: 160, l0: .2, l1: .4, grav: 400 });
+    if(e.y >= mapGroundY){
+      spawnParticles(e.x, mapGroundY, { n: 6, col: ["#7a9b5e","#a3e635"], sp0: 40, sp1: 160, l0: .2, l1: .4, grav: 400 });
       eprojs.splice(i, 1);
     }
   }
@@ -2148,7 +2244,7 @@ function inRect(mx, my, r){ return mx >= r.x && mx <= r.x + r.w && my >= r.y && 
 let introDone = false;
 function startPlay(){
   gameState = "play";
-  if(!introDone && questState.idx === 0 && curMapId === "gateway" && !dialog){
+  if(!introDone && questState.idx === 0 && curMapId === "campus" && !dialog){
     introDone = true;
     startDialog([
       "『아르카나 아카데미 입학 통지서』 — 몇 번을 다시 읽어도 심장이 뛴다.",
@@ -2243,7 +2339,7 @@ function update(dt){
     let used = false;
     if(player.onGround && (pressed["ArrowUp"] || pressed["e"])){
       for(const p of portals){
-        const py = p.y ?? GROUND_Y;
+        const py = p.y ?? mapGroundY;
         if(Math.abs(player.x - p.x) < 46 && Math.abs(player.y - py) < 90){
           startTransition(p.to, p.tx, p.ty); used = true; break;
         }
@@ -2251,7 +2347,7 @@ function update(dt){
     }
     if(!used && !transition && pressed["e"]){
       for(const n of npcs){
-        const ny = n.y ?? GROUND_Y;
+        const ny = n.y ?? mapGroundY;
         if(Math.abs(player.x - n.x) < 56 && Math.abs(player.y - ny) < 78){ talkNPC(n); used = true; break; }
       }
     }
@@ -2265,7 +2361,7 @@ function update(dt){
         // 범용 수집 지점 (교과서·목걸이 등)
         startDialog(q.lines || [q.spot.label + " — 획득!"], ()=>{
           questEvent("inspect", q.target);
-          spawnParticles(q.spot.x, GROUND_Y - 40, { n: 20, col: ["#ffd27f","#fff","#8be9fd"], sp0: 60, sp1: 260, l0: .3, l1: .7, add: true, grav: -60 });
+          spawnParticles(q.spot.x, mapGroundY - 40, { n: 20, col: ["#ffd27f","#fff","#8be9fd"], sp0: 60, sp1: 260, l0: .3, l1: .7, add: true, grav: -60 });
         }, q.spot.label);
       }else if(curMapId === "library" && Math.abs(player.x - 950) < 64){
         inspectBanned();
@@ -2279,12 +2375,12 @@ function update(dt){
 
   // 지하실 분위기: 떠다니는 먼지
   if(curMapId === "basement" && !transition && Math.random() < 0.5){
-    spawnParticles(camX + rand(-20, VIEW_W + 20), rand(90, GROUND_Y - 20),
+    spawnParticles(camX + rand(-20, VIEW_W + 20), rand(90, mapGroundY - 20),
       { n: 1, col: ["#4a5d4a","#3a4a5a","#2f3b30"], sp0: 1, sp1: 8, l0: 1.6, l1: 3.4, grav: 6, drag: 0.995, r0: 1, r1: 2 });
   }
   // 불의 마을 분위기: 피어오르는 잉걸불
   if(mapTheme === "volcano" && !transition && Math.random() < 0.6){
-    spawnParticles(camX + rand(-20, VIEW_W + 20), GROUND_Y - rand(0, 30),
+    spawnParticles(camX + rand(-20, VIEW_W + 20), mapGroundY - rand(0, 30),
       { n: 1, col: ["#ff7b3a","#ffb35c","#ff5030"], sp0: 6, sp1: 30, ang: -Math.PI/2, spread: .5, l0: 1.2, l1: 3.0, grav: -22, drag: 0.994, r0: 1, r1: 3, add: true });
   }
 
@@ -2375,6 +2471,8 @@ function render(){
     sky.addColorStop(0, "#1a2540"); sky.addColorStop(0.5, "#2b3f63"); sky.addColorStop(1, "#4a5f7d");
   }else if(mapTheme === "volcano"){
     sky.addColorStop(0, "#2a0f10"); sky.addColorStop(0.5, "#4a1512"); sky.addColorStop(1, "#7a2410");
+  }else if(mapTheme === "coast"){
+    sky.addColorStop(0, "#241a33"); sky.addColorStop(0.45, "#4a2c45"); sky.addColorStop(1, "#7a4a3d");
   }else{
     sky.addColorStop(0, "#141a33"); sky.addColorStop(0.6, "#23294d"); sky.addColorStop(1, "#31294a");
   }
@@ -2382,10 +2480,11 @@ function render(){
   ctx.fillRect(0, 0, VIEW_W, VIEW_H);
 
   // 달/해 (실내·지하실 제외)
-  if(mapTheme === "harbor"){
+  const skyVisible = camY < mapGroundY - 240;   // 뷰가 지하로 완전히 내려가면 천체 숨김
+  if(skyVisible && (mapTheme === "harbor" || mapTheme === "coast")){
     ctx.fillStyle = "#ffe9b0";
     ctx.beginPath(); ctx.arc(980 - camX*0.05, 130, 44, 0, Math.PI*2); ctx.fill();
-  }else if(mapTheme !== "basement" && mapTheme !== "school" && mapTheme !== "volcano"){
+  }else if(skyVisible && mapTheme !== "basement" && mapTheme !== "school" && mapTheme !== "volcano"){
     ctx.fillStyle = "#e9e6ff";
     ctx.beginPath(); ctx.arc(1080 - camX*0.05, 110, 38, 0, Math.PI*2); ctx.fill();
     ctx.fillStyle = mapTheme === "campus" ? "#1a1533" : mapTheme === "town" ? "#241a33" : "#141a33";
@@ -2397,23 +2496,24 @@ function render(){
 
   // --- 배경 (테마별)
   if(mapTheme === "campus"){
-    for(let i = 0; i < 10; i++){
+    const gy = mapGroundY - camY;   // 지면 스크린 좌표 (세로 스크롤 존 대응)
+    for(let i = 0; i < 18; i++){
       const par = i % 2 === 0 ? 0.35 : 0.55;
       const tx = 100 + i * 340 - camX * par;
       if(tx < -200 || tx > VIEW_W + 200) continue;
       const th = 240 + (i * 67 % 140);
       ctx.fillStyle = i % 2 === 0 ? "#241d45" : "#322a5e";
-      ctx.fillRect(tx - 40, GROUND_Y - th, 80, th);
+      ctx.fillRect(tx - 40, gy - th, 80, th);
       ctx.fillStyle = i % 2 === 0 ? "#1c1638" : "#292250";
       ctx.beginPath();
-      ctx.moveTo(tx - 52, GROUND_Y - th);
-      ctx.lineTo(tx, GROUND_Y - th - 70);
-      ctx.lineTo(tx + 52, GROUND_Y - th);
+      ctx.moveTo(tx - 52, gy - th);
+      ctx.lineTo(tx, gy - th - 70);
+      ctx.lineTo(tx + 52, gy - th);
       ctx.closePath(); ctx.fill();
       ctx.fillStyle = "rgba(255,210,120,.5)";
       for(let wy = 0; wy < 3; wy++){
-        ctx.fillRect(tx - 18, GROUND_Y - th + 34 + wy*56, 10, 16);
-        ctx.fillRect(tx + 8,  GROUND_Y - th + 34 + wy*56, 10, 16);
+        ctx.fillRect(tx - 18, gy - th + 34 + wy*56, 10, 16);
+        ctx.fillRect(tx + 8,  gy - th + 34 + wy*56, 10, 16);
       }
     }
   }else if(mapTheme === "basement"){
@@ -2435,22 +2535,32 @@ function render(){
       ctx.beginPath(); ctx.ellipse(x, 140 + (i*63 % 260), 60, 34, 0, 0, Math.PI*2); ctx.fill();
     }
   }else if(mapTheme === "forest"){
+    const gy = mapGroundY - camY;   // 지면 스크린 좌표
     for(const t of bgTrees){
       const par = t.layer === 0 ? 0.35 : 0.6;
       const x = t.x - camX * par;
       if(x < -120 || x > VIEW_W + 120) continue;
       ctx.fillStyle = t.layer === 0 ? "#1a2140" : "#252c52";
-      ctx.fillRect(x - 8, GROUND_Y - t.h, 16, t.h);
+      ctx.fillRect(x - 8, gy - t.h, 16, t.h);
       ctx.beginPath();
-      ctx.moveTo(x - 46, GROUND_Y - t.h + 30);
-      ctx.lineTo(x, GROUND_Y - t.h - 70);
-      ctx.lineTo(x + 46, GROUND_Y - t.h + 30);
+      ctx.moveTo(x - 46, gy - t.h + 30);
+      ctx.lineTo(x, gy - t.h - 70);
+      ctx.lineTo(x + 46, gy - t.h + 30);
       ctx.closePath(); ctx.fill();
     }
   }
 
   ctx.translate(-camX, -camY);
   drawWorldBackdrop();
+
+  // 주 지면 아래 = 지하 구간 어둠 (심연·카타콤이 '땅속'으로 느껴지게)
+  if(mapH > mapGroundY + 240){
+    const dg = ctx.createLinearGradient(0, mapGroundY + 60, 0, mapGroundY + 340);
+    dg.addColorStop(0, "rgba(5,6,11,0)");
+    dg.addColorStop(1, "rgba(5,6,11,.96)");
+    ctx.fillStyle = dg;
+    ctx.fillRect(camX - 40, mapGroundY + 60, VIEW_W + 80, mapH - mapGroundY - 60);
+  }
 
   // --- 지형
   const GT = {
@@ -2461,6 +2571,7 @@ function render(){
     harbor:   { base:"#5a4130", top:"#7a5738" },
     forest:   { base:"#2d3b2d", top:"#4a6741" },
     volcano:  { base:"#2e1712", top:"#5a2418" },
+    coast:    { base:"#5a4130", top:"#7a5738" },
   };
   for(const pf of platforms){
     const g = GT[mapTheme] || GT.forest;
@@ -2500,7 +2611,7 @@ function render(){
   // --- 안내판
   ctx.textAlign = "center";
   for(const s of signs){
-    const sy = s.y ?? GROUND_Y;
+    const sy = s.y ?? mapGroundY;
     ctx.fillStyle = "#6b4f2e";
     ctx.fillRect(s.x - 4, sy - 46, 8, 46);
     ctx.font = "bold 15px sans-serif";
@@ -2515,7 +2626,7 @@ function render(){
 
   // --- 포탈
   for(const p of portals){
-    const py = p.y ?? GROUND_Y;
+    const py = p.y ?? mapGroundY;
     const pulse = 0.6 + Math.sin(performance.now()/300) * 0.25;
     const tint = p.tint || "#8b5cf6";
     if(p.door){
@@ -2569,7 +2680,7 @@ function render(){
       drawThornWall(GATE_X);
       ctx.textAlign = "center";
       ctx.font = "bold 13px sans-serif"; ctx.fillStyle = "#f0abfc";
-      ctx.fillText("시험 자격 필요 — 퀘스트를 모두 완료하자", GATE_X, GROUND_Y - 190);
+      ctx.fillText("시험 자격 필요 — 퀘스트를 모두 완료하자", GATE_X, mapGroundY - 190);
     }
     if(boss.active && BOSS_M && !BOSS_M.dead){
       drawThornWall(ARENA_L);
@@ -2579,18 +2690,18 @@ function render(){
       if(s.warn > 0){
         const pulse = 0.35 + Math.abs(Math.sin(performance.now()/90)) * 0.35;
         ctx.fillStyle = `rgba(239,68,68,${pulse})`;
-        ctx.fillRect(s.x - 46, GROUND_Y - 6, 92, 6);
+        ctx.fillRect(s.x - 46, mapGroundY - 6, 92, 6);
         ctx.textAlign = "center";
         ctx.font = "bold 18px sans-serif"; ctx.fillStyle = "#ef4444";
-        ctx.fillText("!", s.x, GROUND_Y - 14);
+        ctx.fillText("!", s.x, mapGroundY - 14);
       }else if(s.active > 0){
         const hgt = 72 * Math.min(1, s.active / 0.32);
         ctx.fillStyle = "#5e7a4a";
         for(let ti = -1; ti <= 1; ti++){
           ctx.beginPath();
-          ctx.moveTo(s.x + ti*26 - 12, GROUND_Y);
-          ctx.lineTo(s.x + ti*26, GROUND_Y - hgt * (ti === 0 ? 1 : 0.7));
-          ctx.lineTo(s.x + ti*26 + 12, GROUND_Y);
+          ctx.moveTo(s.x + ti*26 - 12, mapGroundY);
+          ctx.lineTo(s.x + ti*26, mapGroundY - hgt * (ti === 0 ? 1 : 0.7));
+          ctx.lineTo(s.x + ti*26 + 12, mapGroundY);
           ctx.closePath(); ctx.fill();
         }
       }
@@ -2611,7 +2722,7 @@ function render(){
   // --- 지하실: 횃불 + 의문의 문
   if(curMapId === "basement"){
     for(const tx of mapTorches){
-      const ty = GROUND_Y - 250;
+      const ty = mapGroundY - 250;
       // 브래킷
       ctx.fillStyle = "#3a3128";
       ctx.fillRect(tx - 3, ty, 6, 30);
@@ -3007,7 +3118,7 @@ function renderTitle(){
 
   ctx.font = "12px sans-serif"; ctx.fillStyle = "rgba(148,163,184,.6)";
   ctx.fillText("Enter / Space / 클릭으로 시작", VIEW_W/2, 612);
-  ctx.fillText("프로토타입 v0.14 — 아르카나 아카데미", VIEW_W/2, VIEW_H - 20);
+  ctx.fillText("프로토타입 v0.15 — 아르카나 아카데미", VIEW_W/2, VIEW_H - 20);
   ctx.restore();
 
   if(showOptions) renderOptions();
@@ -3096,14 +3207,14 @@ function renderMinimap(){
   }
   // 포탈/문
   for(const p of portals){
-    const py2 = p.y ?? GROUND_Y;
+    const py2 = p.y ?? mapGroundY;
     ctx.fillStyle = p.tint || "#8b5cf6";
     ctx.beginPath(); ctx.arc(ox + p.x * s, oy + (py2 - 40) * s, 2.4, 0, Math.PI*2); ctx.fill();
   }
   // NPC
   ctx.fillStyle = "#fbbf24";
   for(const n of npcs){
-    const ny = n.y ?? GROUND_Y;
+    const ny = n.y ?? mapGroundY;
     ctx.fillRect(ox + n.x * s - 1.5, oy + (ny - 40) * s - 1.5, 3, 3);
   }
   // 몬스터
@@ -3124,20 +3235,17 @@ function renderMinimap(){
 
 // 월드맵 노드 (아르피아/메이플식 지역 연결도)
 const WORLD_NODES = [
-  { id:"basement", name:"학교 지하실",   x: 205, y: 355, col:"#4ade80" },
-  { id:"school",   name:"본관",          x: 330, y: 250, col:"#ffd27f",
-    rooms:["classbasic","classinter","classadv","library","principal","infirmary","shoproom"] },
-  { id:"campus",   name:"교정",          x: 495, y: 250, col:"#c4b5fd", rooms:["clubroom"] },
-  { id:"gateway",  name:"학교 가는 길",  x: 495, y: 130, col:"#a78bfa", tag:"입학의 언덕" },
-  { id:"forest",   name:"입문의 숲",     x: 665, y: 160, col:"#5fd068", tag:"사냥터 · 시험장" },
-  { id:"road1",    name:"학교 뒷숲",     x: 665, y: 340, col:"#5fd068" },
-  { id:"village",  name:"여명 마을",     x: 800, y: 340, col:"#f0abfc" },
-  { id:"harbor",   name:"소금바람 항구", x: 800, y: 445, col:"#7dd3fc", tag:"불의 마을 항로" },
-  { id:"firevil",  name:"불의 마을",     x: 610, y: 470, col:"#ff5030", tag:"화산 · 화염 군주" },
+  { id:"school",   name:"본관",          x: 300, y: 220, col:"#ffd27f",
+    rooms:["classbasic","classinter","classadv","library","principal","infirmary","shoproom","trainhall"] },
+  { id:"campus",   name:"아르카나 언덕", x: 490, y: 250, col:"#c4b5fd", rooms:["clubroom"], tag:"허브 · 시계탑" },
+  { id:"forest",   name:"깊은 숲",       x: 700, y: 200, col:"#5fd068", tag:"캐노피 · 심연 · 시험장" },
+  { id:"basement", name:"지하 미궁",     x: 490, y: 430, col:"#4ade80", tag:"세계의 교차로" },
+  { id:"village",  name:"노을 해안",     x: 250, y: 340, col:"#f0abfc", tag:"마을 · 항구 · 등대" },
+  { id:"firevil",  name:"불의 마을",     x: 250, y: 490, col:"#ff5030", tag:"화산 · 화염 군주" },
 ];
 const WORLD_EDGES = [
-  ["basement","school"], ["school","campus"], ["campus","forest"], ["gateway","campus"],
-  ["campus","road1"], ["road1","village"], ["village","harbor"], ["harbor","firevil"],
+  ["school","campus"], ["campus","forest"], ["campus","village"], ["campus","basement"],
+  ["school","basement"], ["forest","basement"], ["village","basement"], ["village","firevil"],
 ];
 function worldNodeOf(mapId){
   return WORLD_NODES.find(n => n.id === mapId || (n.rooms && n.rooms.includes(mapId)));
@@ -3275,25 +3383,25 @@ function drawWorldBackdrop(){
       const hh = 170 + (Math.floor(hx/360) % 3) * 40;
       const bw = 210;
       ctx.fillStyle = "#3a2f4a";
-      ctx.fillRect(hx, GROUND_Y - hh, bw, hh);
+      ctx.fillRect(hx, mapGroundY - hh, bw, hh);
       ctx.fillStyle = "#5a3f47";                       // 지붕
       ctx.beginPath();
-      ctx.moveTo(hx - 16, GROUND_Y - hh);
-      ctx.lineTo(hx + bw/2, GROUND_Y - hh - 54);
-      ctx.lineTo(hx + bw + 16, GROUND_Y - hh);
+      ctx.moveTo(hx - 16, mapGroundY - hh);
+      ctx.lineTo(hx + bw/2, mapGroundY - hh - 54);
+      ctx.lineTo(hx + bw + 16, mapGroundY - hh);
       ctx.closePath(); ctx.fill();
       ctx.fillStyle = "rgba(255,210,120,.55)";         // 창문
       for(let r = 0; r < 2; r++) for(let c = 0; c < 3; c++)
-        ctx.fillRect(hx + 24 + c*60, GROUND_Y - hh + 34 + r*58, 30, 34);
+        ctx.fillRect(hx + 24 + c*60, mapGroundY - hh + 34 + r*58, 30, 34);
     }
   }else if(mapTheme === "harbor"){
     // 바다 + 파도
     const seaTop = 470;
-    const sg = ctx.createLinearGradient(0, seaTop, 0, GROUND_Y);
+    const sg = ctx.createLinearGradient(0, seaTop, 0, mapGroundY);
     sg.addColorStop(0, "#2c4a6e"); sg.addColorStop(1, "#1a3450");
-    ctx.fillStyle = sg; ctx.fillRect(camX - 20, seaTop, VIEW_W + 40, GROUND_Y - seaTop);
+    ctx.fillStyle = sg; ctx.fillRect(camX - 20, seaTop, VIEW_W + 40, mapGroundY - seaTop);
     ctx.strokeStyle = "rgba(180,220,255,.25)"; ctx.lineWidth = 2;
-    for(let wy = seaTop + 20; wy < GROUND_Y; wy += 26){
+    for(let wy = seaTop + 20; wy < mapGroundY; wy += 26){
       ctx.beginPath();
       for(let wx = camX - 20; wx < camX + VIEW_W + 20; wx += 40){
         const yy = wy + Math.sin((wx + performance.now()/16)/60) * 3;
@@ -3313,6 +3421,64 @@ function drawWorldBackdrop(){
       ctx.fillStyle = "#22384f";
       ctx.beginPath(); ctx.moveTo(sx + 4, seaTop - 36); ctx.lineTo(sx + 54, seaTop + 8); ctx.lineTo(sx + 4, seaTop + 8); ctx.closePath(); ctx.fill();
     }
+  }else if(mapTheme === "coast"){
+    // 서쪽: 바다 + 파도 + 먼 배
+    const seaTop = mapGroundY - 170;
+    const seaR = Math.min(vx1 + 20, 2650);
+    if(vx0 < 2650){
+      const sg = ctx.createLinearGradient(0, seaTop, 0, mapGroundY);
+      sg.addColorStop(0, "#2c4a6e"); sg.addColorStop(1, "#1a3450");
+      ctx.fillStyle = sg; ctx.fillRect(Math.max(vx0 - 20, -20), seaTop, seaR - Math.max(vx0 - 20, -20), mapGroundY - seaTop);
+      ctx.strokeStyle = "rgba(180,220,255,.25)"; ctx.lineWidth = 2;
+      for(let wy = seaTop + 20; wy < mapGroundY; wy += 26){
+        ctx.beginPath();
+        for(let wx = Math.max(vx0 - 20, 0); wx < seaR; wx += 40){
+          const yy = wy + Math.sin((wx + performance.now()/16)/60) * 3;
+          if(wx === Math.max(vx0 - 20, 0)) ctx.moveTo(wx, yy); else ctx.lineTo(wx, yy);
+        }
+        ctx.stroke();
+      }
+      for(const sx of [700, 1500]){
+        if(sx < vx0 - 200 || sx > vx1 + 200) continue;
+        ctx.fillStyle = "#16283e";
+        ctx.beginPath();
+        ctx.moveTo(sx - 90, seaTop + 40); ctx.lineTo(sx + 90, seaTop + 40);
+        ctx.lineTo(sx + 60, seaTop + 74); ctx.lineTo(sx - 60, seaTop + 74);
+        ctx.closePath(); ctx.fill();
+        ctx.fillRect(sx - 4, seaTop - 40, 8, 80);
+        ctx.fillStyle = "#22384f";
+        ctx.beginPath(); ctx.moveTo(sx + 4, seaTop - 36); ctx.lineTo(sx + 54, seaTop + 8); ctx.lineTo(sx + 4, seaTop + 8); ctx.closePath(); ctx.fill();
+      }
+    }
+    // 등대 (절벽 위 실루엣)
+    if(vx0 < 700){
+      ctx.fillStyle = "#3a2f4a";
+      ctx.fillRect(380, 560 - 150, 44, 150);
+      ctx.fillStyle = "#5a3f47";
+      ctx.fillRect(370, 560 - 170, 64, 24);
+      ctx.save(); ctx.globalCompositeOperation = "lighter";
+      const lg = ctx.createRadialGradient(402, 560 - 158, 3, 402, 560 - 158, 70);
+      lg.addColorStop(0, "rgba(255,235,160,.9)"); lg.addColorStop(1, "rgba(255,220,120,0)");
+      ctx.fillStyle = lg; ctx.beginPath(); ctx.arc(402, 560 - 158, 70, 0, Math.PI*2); ctx.fill();
+      ctx.restore();
+    }
+    // 동쪽: 마을 집들
+    for(let hx = 3320; hx < mapW - 260; hx += 360){
+      if(hx < vx0 - 260 || hx > vx1 + 260) continue;
+      const hh = 170 + (Math.floor(hx/360) % 3) * 40;
+      const bw = 210;
+      ctx.fillStyle = "#3a2f4a";
+      ctx.fillRect(hx, mapGroundY - hh, bw, hh);
+      ctx.fillStyle = "#5a3f47";
+      ctx.beginPath();
+      ctx.moveTo(hx - 16, mapGroundY - hh);
+      ctx.lineTo(hx + bw/2, mapGroundY - hh - 54);
+      ctx.lineTo(hx + bw + 16, mapGroundY - hh);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "rgba(255,210,120,.55)";
+      for(let r = 0; r < 2; r++) for(let c = 0; c < 3; c++)
+        ctx.fillRect(hx + 24 + c*60, mapGroundY - hh + 34 + r*58, 30, 34);
+    }
   }else if(mapTheme === "volcano"){
     // 뒤쪽 화산 실루엣 + 정상 용암 불빛
     for(const v of [{x:1300, h:360, w:520}, {x:2500, h:440, w:620}]){
@@ -3320,28 +3486,28 @@ function drawWorldBackdrop(){
       const par = 0.5, vxp = v.x - camX * (par - 1);   // (그려질 좌표는 이미 -camX 적용된 컨텍스트)
       ctx.fillStyle = "#3a1712";
       ctx.beginPath();
-      ctx.moveTo(v.x - v.w/2, GROUND_Y);
-      ctx.lineTo(v.x - v.w*0.13, GROUND_Y - v.h);
-      ctx.lineTo(v.x + v.w*0.13, GROUND_Y - v.h);
-      ctx.lineTo(v.x + v.w/2, GROUND_Y);
+      ctx.moveTo(v.x - v.w/2, mapGroundY);
+      ctx.lineTo(v.x - v.w*0.13, mapGroundY - v.h);
+      ctx.lineTo(v.x + v.w*0.13, mapGroundY - v.h);
+      ctx.lineTo(v.x + v.w/2, mapGroundY);
       ctx.closePath(); ctx.fill();
       // 분화구 용암 광
       ctx.save(); ctx.globalCompositeOperation = "lighter";
-      const g = ctx.createRadialGradient(v.x, GROUND_Y - v.h, 4, v.x, GROUND_Y - v.h, 90);
+      const g = ctx.createRadialGradient(v.x, mapGroundY - v.h, 4, v.x, mapGroundY - v.h, 90);
       g.addColorStop(0, "rgba(255,140,40,.8)"); g.addColorStop(1, "rgba(255,60,20,0)");
-      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(v.x, GROUND_Y - v.h, 90, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(v.x, mapGroundY - v.h, 90, 0, Math.PI*2); ctx.fill();
       ctx.restore();
       // 흘러내리는 용암 줄기
       ctx.strokeStyle = "rgba(255,90,30,.5)"; ctx.lineWidth = 4;
-      ctx.beginPath(); ctx.moveTo(v.x, GROUND_Y - v.h);
-      ctx.lineTo(v.x - v.w*0.16, GROUND_Y - v.h*0.4); ctx.lineTo(v.x - v.w*0.05, GROUND_Y); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(v.x, mapGroundY - v.h);
+      ctx.lineTo(v.x - v.w*0.16, mapGroundY - v.h*0.4); ctx.lineTo(v.x - v.w*0.05, mapGroundY); ctx.stroke();
     }
     // 지면 용암 균열 빛
     ctx.save(); ctx.globalCompositeOperation = "lighter";
     for(let lx = Math.floor(vx0/220)*220; lx < vx1 + 220; lx += 220){
       const gx = lx + ((lx*53) % 120);
       ctx.fillStyle = "rgba(255,90,30,.22)";
-      ctx.beginPath(); ctx.ellipse(gx, GROUND_Y + 4, 60, 8, 0, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(gx, mapGroundY + 4, 60, 8, 0, 0, Math.PI*2); ctx.fill();
     }
     ctx.restore();
     // 정박한 배 (돌아가는 항로)
@@ -3349,12 +3515,12 @@ function drawWorldBackdrop(){
     if(bx > vx0 - 200 && bx < vx1 + 200){
       ctx.fillStyle = "#3a2418";
       ctx.beginPath();
-      ctx.moveTo(bx - 70, GROUND_Y - 20); ctx.lineTo(bx + 70, GROUND_Y - 20);
-      ctx.lineTo(bx + 46, GROUND_Y + 14); ctx.lineTo(bx - 46, GROUND_Y + 14);
+      ctx.moveTo(bx - 70, mapGroundY - 20); ctx.lineTo(bx + 70, mapGroundY - 20);
+      ctx.lineTo(bx + 46, mapGroundY + 14); ctx.lineTo(bx - 46, mapGroundY + 14);
       ctx.closePath(); ctx.fill();
-      ctx.fillStyle = "#5a3a24"; ctx.fillRect(bx - 3, GROUND_Y - 92, 6, 74);
+      ctx.fillStyle = "#5a3a24"; ctx.fillRect(bx - 3, mapGroundY - 92, 6, 74);
       ctx.fillStyle = "#c9a15a";
-      ctx.beginPath(); ctx.moveTo(bx + 4, GROUND_Y - 88); ctx.lineTo(bx + 50, GROUND_Y - 30); ctx.lineTo(bx + 4, GROUND_Y - 30); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(bx + 4, mapGroundY - 88); ctx.lineTo(bx + 50, mapGroundY - 30); ctx.lineTo(bx + 4, mapGroundY - 30); ctx.closePath(); ctx.fill();
     }
   }
 }
@@ -3400,7 +3566,7 @@ function drawInfernoBeam(){
 
 // 도서관 금서 서가 (고급 마법 퀘스트 조사 지점)
 function drawBannedShelf(){
-  const x = 950, y = GROUND_Y;
+  const x = 950, y = mapGroundY;
   ctx.fillStyle = "#241a10"; ctx.fillRect(x - 60, y - 156, 120, 156);
   ctx.fillStyle = "#3a2a18";
   for(let ry = 0; ry < 4; ry++) ctx.fillRect(x - 54, y - 144 + ry*36, 108, 26);
@@ -3435,7 +3601,7 @@ function drawBannedShelf(){
 
 // 지하실 『홍염의 서』 (QI_TOME 단계에만 존재)
 function drawTome(){
-  const x = 3100, y = GROUND_Y - 46 + Math.sin(performance.now()/400) * 7;
+  const x = 3100, y = mapGroundY - 46 + Math.sin(performance.now()/400) * 7;
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
   const g = ctx.createRadialGradient(x, y, 3, x, y, 60);
@@ -3463,7 +3629,7 @@ function drawTome(){
 
 // 범용 퀘스트 수집 지점 — 금빛 반짝임 + 라벨 + E 프롬프트
 function drawQuestSpot(spot){
-  const x = spot.x, y = GROUND_Y - 26 + Math.sin(performance.now()/420) * 5;
+  const x = spot.x, y = mapGroundY - 26 + Math.sin(performance.now()/420) * 5;
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
   const g = ctx.createRadialGradient(x, y, 2, x, y, 44);
@@ -3515,7 +3681,7 @@ function drawMeteors(){
 
 // 『멸화의 불씨』 회수 지점 (화염 군주 격파 후)
 function drawEmberPickup(){
-  const x = 2700, y = GROUND_Y - 30 + Math.sin(performance.now()/380) * 6;
+  const x = 2700, y = mapGroundY - 30 + Math.sin(performance.now()/380) * 6;
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
   const g = ctx.createRadialGradient(x, y, 3, x, y, 54);
@@ -3539,10 +3705,10 @@ function drawEmberPickup(){
 
 function drawThornWall(x){
   ctx.fillStyle = "#3d4d2e";
-  ctx.fillRect(x - 7, GROUND_Y - 170, 14, 170);
+  ctx.fillRect(x - 7, mapGroundY - 170, 14, 170);
   ctx.fillStyle = "#5e7a4a";
   for(let i = 0; i < 6; i++){
-    const wy = GROUND_Y - 20 - i*28;
+    const wy = mapGroundY - 20 - i*28;
     const dirn = i % 2 ? 1 : -1;
     ctx.beginPath();
     ctx.moveTo(x, wy);
@@ -3553,7 +3719,7 @@ function drawThornWall(x){
 }
 
 function drawMysteryDoor(x){
-  const y = GROUND_Y, W = 96, H = 168;
+  const y = mapGroundY, W = 96, H = 168;
   const pulse = 0.5 + Math.sin(performance.now()/650) * 0.5;
   // 뒤쪽 오라
   ctx.save();
@@ -3703,7 +3869,7 @@ function drawTeacher(t, x, y){
 
 // 범용 NPC 렌더 (교사는 drawTeacher로 위임)
 function drawNPC(n){
-  const y = n.y ?? GROUND_Y;
+  const y = n.y ?? mapGroundY;
   if(n.kind === "teacher"){ drawTeacher(teacherByRef(n.tref), n.x, y); return; }
   const x = n.x;
   const P2 = {
@@ -4148,7 +4314,7 @@ function renderHUD(){
 
   ctx.textAlign = "right";
   ctx.font = "11px sans-serif"; ctx.fillStyle = "rgba(148,163,184,.55)";
-  ctx.fillText("아르카나 아카데미 프로토타입 v0.14 — 스토리 개편", VIEW_W - 14, 22);
+  ctx.fillText("아르카나 아카데미 프로토타입 v0.15 — 이어진 세계", VIEW_W - 14, 22);
   if(saveFlash > 0){
     ctx.globalAlpha = Math.min(1, saveFlash);
     ctx.font = "12px sans-serif"; ctx.fillStyle = "#4ade80";
@@ -4543,7 +4709,7 @@ function roundRect(x, y, w, h, r){
 }
 
 // ============================== BOOT & MAIN LOOP ==============================
-loadMap("gateway", 170);  // 신규 시작: 튜토리얼 — 학교 가는 길
+loadMap("campus", 200);   // 신규 시작: 아르카나 언덕 서쪽 기슭 (튜토리얼)
 loadGame();               // 저장 데이터가 있으면 해당 진행으로 이어하기
 
 let last = performance.now(), acc = 0;
