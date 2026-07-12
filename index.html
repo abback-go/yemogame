@@ -963,9 +963,10 @@ function loadMap(id, spawnX, spawnY){
   player.y = spawnY ?? mapGroundY; player.vx = 0; player.vy = 0;
   camX = clamp(player.x - VIEW_W/2, 0, Math.max(0, mapW - VIEW_W));
   camY = clamp(player.y - VIEW_H*0.62, 0, Math.max(0, mapH - VIEW_H));
-  addFloatText(player.x, player.y - 130, M.name, "#8be9fd");
+  areaBanner = { name: M.name, tag: (worldNodeOf(id)||{}).tag || "", t: 0 };
   questEvent("visit", id);   // '~에 방문' 퀘스트
 }
+let areaBanner = null;
 
 // ============================== PLAYER ==============================
 const player = {
@@ -1686,13 +1687,20 @@ function talkNPC(n){
   startDialog(n.lines || ["…"], null, n.name);   // info / shop / club
 }
 
-let dialog = null;   // { lines, i, speaker, onEnd }
+let dialog = null;   // { lines, i, speaker, onEnd, t0 }
 function startDialog(lines, onEnd, speaker){
-  dialog = { lines, i: 0, onEnd: onEnd || null, speaker: speaker || "" };
+  dialog = { lines, i: 0, onEnd: onEnd || null, speaker: speaker || "", t0: performance.now() };
+}
+function dialogRevealed(){   // 현재 줄이 전부 드러났는가
+  if(!dialog) return true;
+  const line = dialog.lines[dialog.i] || "";
+  return (performance.now() - dialog.t0) / 20 >= line.length;
 }
 function advanceDialog(){
   if(!dialog) return;
+  if(!dialogRevealed()){ dialog.t0 = 0; return; }   // 첫 입력은 즉시 완성
   dialog.i++;
+  dialog.t0 = performance.now();
   if(dialog.i >= dialog.lines.length){
     const cb = dialog.onEnd; dialog = null;
     if(cb) cb();
@@ -2868,7 +2876,7 @@ function updateEprojs(dt){
 }
 
 // ============================== UPDATE ==============================
-let showHelp = true, showBook = false, showTrainer = false, showForge = false, bookPage = 0;
+let showHelp = false, showBook = false, showTrainer = false, showForge = false, bookPage = 0;
 let gameState = "title", titleT = 0, showOptions = false, optResetArm = 0, showWorldMap = false;
 
 // 타이틀 버튼 영역
@@ -3066,6 +3074,19 @@ function update(dt){
     spawnParticles(camX + rand(-20, VIEW_W + 20), mapGroundY - rand(0, 30),
       { n: 1, col: ["#ff7b3a","#ffb35c","#ff5030"], sp0: 6, sp1: 30, ang: -Math.PI/2, spread: .5, l0: 1.2, l1: 3.0, grav: -22, drag: 0.994, r0: 1, r1: 3, add: true });
   }
+  // 범용 앰비언트 먼지/포자/불티 (테마별) — 화면 전역에 은은히 떠다님
+  if(!transition && gameState === "play"){
+    const art = themeArt();
+    if(art.ambN > 0 && Math.random() < art.ambN){
+      const up = mapTheme==="volcano"||mapTheme==="forge"||mapTheme==="garden"||mapTheme==="temple";
+      spawnParticles(camX + rand(-20, VIEW_W + 20), camY + rand(40, VIEW_H - 40),
+        { n: 1, col: art.amb, sp0: 2, sp1: 14, ang: up?-Math.PI/2:Math.PI/2, spread: 1.2,
+          l0: 2.0, l1: 4.5, grav: up?-8:6, drag: 0.996, r0: 1, r1: 2.4, add: art.warm });
+    }
+  }
+
+  // 지역명 배너 수명
+  if(areaBanner){ areaBanner.t += dt; if(areaBanner.t > 3.6) areaBanner = null; }
 
   // --- 자동 저장 / 초기화(F2 두 번)
   saveTimer -= dt;
@@ -3199,6 +3220,28 @@ function render(){
     ctx.fillStyle = mapTheme === "campus" ? "#1a1533" : mapTheme === "town" ? "#241a33" : "#141a33";
     ctx.beginPath(); ctx.arc(1094 - camX*0.05, 100, 34, 0, Math.PI*2); ctx.fill();
   }
+  // 별 (야외 밤 존)
+  if(mapTheme==="campus"||mapTheme==="forest"||mapTheme==="town"||mapTheme==="harbor"||mapTheme==="coast"){
+    ctx.fillStyle = "rgba(255,255,255,.5)";
+    for(let i=0;i<60;i++){
+      const sxp = (i*197)%VIEW_W, syp = (i*89)%Math.floor(VIEW_H*0.5);
+      const tw = 0.3 + 0.5*Math.abs(Math.sin(performance.now()/1400 + i));
+      ctx.globalAlpha = tw*0.6; ctx.fillRect(sxp, syp, 2, 2);
+    }
+    ctx.globalAlpha = 1;
+  }
+  // 원경 안개 밴드 (대기 원근) — 지평선 부근을 테마색으로 부드럽게
+  {
+    const gy = mapGroundY - camY;
+    const top = Math.max(0, gy - 260);
+    if(top < VIEW_H){
+      const hz = ctx.createLinearGradient(0, top, 0, Math.min(VIEW_H, gy + 40));
+      hz.addColorStop(0, "rgba(0,0,0,0)");
+      hz.addColorStop(1, themeArt().haze);
+      ctx.save(); ctx.globalAlpha = 0.5; ctx.fillStyle = hz;
+      ctx.fillRect(0, top, VIEW_W, Math.min(VIEW_H, gy + 40) - top); ctx.restore();
+    }
+  }
 
   ctx.save();
   ctx.translate(sh.x, sh.y);
@@ -3289,17 +3332,44 @@ function render(){
     ash:      { base:"#2a2a30", top:"#48484f" },
     temple:   { base:"#3a2c16", top:"#6a5228" },
   };
+  const vlx = camX - 20, vrx = camX + VIEW_W + 20;
+  const organic = mapTheme==="forest"||mapTheme==="garden";
+  const snowy = mapTheme==="snow"||mapTheme==="ice";
   for(const pf of platforms){
     const g = GT[mapTheme] || GT.forest;
+    const cx0 = Math.max(pf.x, vlx), cx1 = Math.min(pf.x + pf.w, vrx);
+    if(cx1 <= cx0) continue;
     if(pf.solidGround){
-      ctx.fillStyle = g.base; ctx.fillRect(pf.x, pf.y, pf.w, pf.h);
-      ctx.fillStyle = g.top;  ctx.fillRect(pf.x, pf.y, pf.w, 10);
-      ctx.fillStyle = "rgba(0,0,0,.2)";
-      const step = mapTheme === "harbor" ? 40 : 84;   // 항구=널빤지
-      for(let bx = 0; bx < pf.w; bx += step) ctx.fillRect(pf.x + bx, pf.y + 10, 2, pf.h - 10);
+      // 본체 그라데이션
+      const bg = ctx.createLinearGradient(0, pf.y, 0, pf.y + Math.min(pf.h, 200));
+      bg.addColorStop(0, g.top); bg.addColorStop(0.18, g.base);
+      bg.addColorStop(1, shade(g.base, -0.35));
+      ctx.fillStyle = bg; ctx.fillRect(cx0, pf.y, cx1 - cx0, pf.h);
+      // 상단 밴드 + 하이라이트 라인
+      ctx.fillStyle = g.top; ctx.fillRect(cx0, pf.y, cx1 - cx0, 8);
+      ctx.fillStyle = shade(g.top, 0.4); ctx.fillRect(cx0, pf.y, cx1 - cx0, 2);
+      // 세로 결(질감)
+      ctx.fillStyle = "rgba(0,0,0,.16)";
+      const step = mapTheme === "harbor" || mapTheme === "coast" ? 40 : 90;
+      for(let bx = Math.ceil(cx0/step)*step; bx < cx1; bx += step) ctx.fillRect(bx, pf.y + 8, 2, pf.h - 8);
+      // 유기물 디테일 (풀/눈 캡)
+      if(organic || snowy){
+        for(let bx = Math.ceil(cx0/26)*26; bx < cx1; bx += 26){
+          const h = 4 + ((bx*7)%6);
+          ctx.fillStyle = organic ? (((bx*13)%2) ? "#5a8a4a" : "#6ba055") : "rgba(255,255,255,.85)";
+          if(organic){ ctx.fillRect(bx, pf.y - h, 2, h); ctx.fillRect(bx+4, pf.y - h*0.7, 2, h*0.7); }
+          else ctx.fillRect(bx-2, pf.y - 2, 8, 3);
+        }
+      }
     }else{
-      ctx.fillStyle = g.base; ctx.fillRect(pf.x, pf.y, pf.w, pf.h);
-      ctx.fillStyle = g.top;  ctx.fillRect(pf.x, pf.y, pf.w, 5);
+      // 원웨이 발판 — 둥근 느낌 + 그림자
+      ctx.fillStyle = "rgba(0,0,0,.28)"; roundRect(cx0, pf.y+2, cx1-cx0, pf.h, 4); ctx.fill();
+      const bg = ctx.createLinearGradient(0, pf.y, 0, pf.y+pf.h);
+      bg.addColorStop(0, g.top); bg.addColorStop(1, g.base);
+      ctx.fillStyle = bg; roundRect(cx0, pf.y, cx1-cx0, pf.h, 4); ctx.fill();
+      ctx.fillStyle = shade(g.top, 0.35); ctx.fillRect(cx0+3, pf.y+1, cx1-cx0-6, 2);
+      if(organic){ ctx.fillStyle = "#5a8a4a";
+        for(let bx = Math.ceil(cx0/22)*22; bx < cx1-4; bx += 22){ const h=3+((bx*5)%4); ctx.fillRect(bx, pf.y-h, 2, h); } }
     }
   }
 
@@ -3324,20 +3394,36 @@ function render(){
     ctx.beginPath(); ctx.moveTo(s.x0, s.y0 - 40); ctx.lineTo(s.x1, s.y1 - 40); ctx.stroke();
   }
 
-  // --- 안내판
+  // --- 안내판 (작은 나무 팻말 + 근접 시에만 문구 툴팁)
   ctx.textAlign = "center";
   for(const s of signs){
     const sy = s.y ?? mapGroundY;
-    ctx.fillStyle = "#6b4f2e";
-    ctx.fillRect(s.x - 4, sy - 46, 8, 46);
-    ctx.font = "bold 15px sans-serif";
-    const w = Math.max(120, ctx.measureText(s.text).width + 24);
-    ctx.fillStyle = "#8a683d";
-    ctx.fillRect(s.x - w/2, sy - 88, w, 40);
-    ctx.strokeStyle = "#5b4426"; ctx.lineWidth = 3;
-    ctx.strokeRect(s.x - w/2, sy - 88, w, 40);
-    ctx.fillStyle = "#fdf2d0";
-    ctx.fillText(s.text, s.x, sy - 63);
+    const near = Math.abs(player.x - s.x) < 150 && Math.abs((player.y) - sy) < 200;
+    // 기둥
+    ctx.fillStyle = "#5a4126"; ctx.fillRect(s.x - 3, sy - 40, 6, 40);
+    ctx.fillStyle = "#3e2c17"; ctx.fillRect(s.x - 3, sy - 40, 2, 40);
+    // 팻말 (작은 나무판 + 화살표 아이콘)
+    ctx.fillStyle = "#7a5a34"; roundRect(s.x - 16, sy - 62, 32, 22, 3); ctx.fill();
+    ctx.strokeStyle = "#4a3418"; ctx.lineWidth = 2; roundRect(s.x - 16, sy - 62, 32, 22, 3); ctx.stroke();
+    ctx.fillStyle = "#e8c98a"; ctx.font = "bold 14px sans-serif"; ctx.fillText("!", s.x, sy - 46);
+    // 근접 시 문구 (부드럽게 페이드)
+    const a = near ? 1 : 0;
+    if(s._a === undefined) s._a = 0;
+    s._a += (a - s._a) * 0.2;
+    if(s._a > 0.02){
+      ctx.save(); ctx.globalAlpha = s._a;
+      ctx.font = "600 14px 'Trebuchet MS',sans-serif";
+      const w = ctx.measureText(s.text).width + 28;
+      const bx = clamp(s.x, camX + w/2 + 8, camX + VIEW_W - w/2 - 8);
+      const by = sy - 96;
+      ctx.fillStyle = "rgba(14,16,28,.92)"; roundRect(bx - w/2, by - 20, w, 30, 8); ctx.fill();
+      ctx.strokeStyle = "rgba(180,150,90,.5)"; ctx.lineWidth = 1.5; roundRect(bx - w/2, by - 20, w, 30, 8); ctx.stroke();
+      // 말풍선 꼬리
+      ctx.fillStyle = "rgba(14,16,28,.92)"; ctx.beginPath();
+      ctx.moveTo(s.x-6, by+9); ctx.lineTo(s.x+6, by+9); ctx.lineTo(s.x, by+18); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "#f0e6d0"; ctx.fillText(s.text, bx, by);
+      ctx.restore();
+    }
   }
 
   // --- 포탈
@@ -3763,6 +3849,40 @@ function render(){
     ctx.fillRect(0, 0, VIEW_W, VIEW_H);
   }
 
+  // ── 분위기 후처리 (컬러 그레이드 · 갓레이 · 소프트 비네트) ──
+  if(gameState === "play"){
+    const art = themeArt();
+    // 갓레이 (정원·신전 등 밝은 성역)
+    if(art.rays){
+      ctx.save(); ctx.globalCompositeOperation = "lighter";
+      for(let i=0;i<5;i++){
+        const rx = VIEW_W*(0.2+i*0.16) + Math.sin(performance.now()/4000+i)*30;
+        const g = ctx.createLinearGradient(rx, 0, rx-160, VIEW_H);
+        g.addColorStop(0, "rgba(255,250,220,.06)"); g.addColorStop(1, "rgba(255,250,220,0)");
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.moveTo(rx,0); ctx.lineTo(rx+80,0); ctx.lineTo(rx-80,VIEW_H); ctx.lineTo(rx-200,VIEW_H); ctx.closePath(); ctx.fill();
+      }
+      ctx.restore();
+    }
+    // 컬러 그레이드 (테마 무드)
+    ctx.save(); ctx.globalCompositeOperation = "soft-light";
+    ctx.fillStyle = art.grade; ctx.fillRect(0,0,VIEW_W,VIEW_H);
+    ctx.restore();
+    // 상단 광원 글로우 (야외 존)
+    if(art.light !== "rgba(0,0,0,0)"){
+      ctx.save(); ctx.globalCompositeOperation = "lighter";
+      const lg = ctx.createLinearGradient(0,0,0,VIEW_H*0.5);
+      lg.addColorStop(0, art.light); lg.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = lg; ctx.fillRect(0,0,VIEW_W,VIEW_H*0.5);
+      ctx.restore();
+    }
+    // 소프트 비네트 (모든 맵) — 어둠 존은 별도 강한 비네트가 아래에서 추가
+    const vg = ctx.createRadialGradient(VIEW_W/2, VIEW_H*0.46, VIEW_H*0.32, VIEW_W/2, VIEW_H*0.5, VIEW_H*0.95);
+    vg.addColorStop(0, "rgba(0,0,0,0)");
+    vg.addColorStop(1, mapTheme==="garden"||mapTheme==="snow" ? "rgba(20,26,40,.28)" : "rgba(6,7,16,.46)");
+    ctx.fillStyle = vg; ctx.fillRect(0,0,VIEW_W,VIEW_H);
+  }
+
   // 어둠 비네트 (지하실·광산) — 도깨비불 켜면 시야 확대
   if(mapTheme === "basement" || mapTheme === "mine"){
     const plsx = player.x - camX, plsy = player.y - camY - 40;
@@ -3801,80 +3921,144 @@ function render(){
     renderHUD();
   }
 
-  // --- 맵 전환 페이드
+  // --- 지역명 배너 (진입 시 상단 중앙, 페이드 인/아웃)
+  if(areaBanner && gameState === "play"){
+    const t = areaBanner.t;
+    const a = t < 0.4 ? t/0.4 : t > 3.0 ? Math.max(0, (3.6-t)/0.6) : 1;
+    ctx.save(); ctx.globalAlpha = a; ctx.textAlign = "center";
+    const cyb = 108;
+    // 장식 라인
+    ctx.strokeStyle = "rgba(242,196,107,.5)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(VIEW_W/2-150, cyb+14); ctx.lineTo(VIEW_W/2-30, cyb+14);
+    ctx.moveTo(VIEW_W/2+30, cyb+14); ctx.lineTo(VIEW_W/2+150, cyb+14); ctx.stroke();
+    ctx.fillStyle = "#f2c46b"; ctx.save(); ctx.translate(VIEW_W/2, cyb+14); ctx.rotate(Math.PI/4); ctx.fillRect(-3,-3,6,6); ctx.restore();
+    headerText(areaBanner.name, VIEW_W/2, cyb, 26, "#fdf3dd", 2, "center");
+    if(areaBanner.tag) headerText(areaBanner.tag, VIEW_W/2, cyb+34, 12, "rgba(200,208,224,.7)", 3, "center");
+    ctx.restore();
+  }
+
+  // --- 맵 전환 페이드 (부드러운 이징)
   if(transition){
-    const a = transition.phase === "out" ? Math.min(1, transition.t) : Math.max(0, 1 - transition.t);
-    ctx.fillStyle = `rgba(5,6,14,${a})`;
+    const raw = transition.phase === "out" ? Math.min(1, transition.t) : Math.max(0, 1 - transition.t);
+    const a = raw*raw*(3-2*raw);   // smoothstep
+    ctx.fillStyle = `rgba(6,7,16,${a})`;
     ctx.fillRect(0, 0, VIEW_W, VIEW_H);
   }
 }
 
 // ============================== 타이틀 화면 ==============================
 function renderTitle(){
-  // 월드 위에 어두운 마법빛 오버레이
-  const og = ctx.createLinearGradient(0, 0, 0, VIEW_H);
-  og.addColorStop(0, "rgba(8,6,20,.88)");
-  og.addColorStop(0.5, "rgba(10,8,26,.80)");
-  og.addColorStop(1, "rgba(6,5,16,.92)");
-  ctx.fillStyle = og;
-  ctx.fillRect(0, 0, VIEW_W, VIEW_H);
-
-  ctx.save();
-  ctx.textAlign = "center";
-
-  // 로고
-  const bob = Math.sin(titleT * 1.4) * 6;
-  ctx.save();
-  ctx.globalCompositeOperation = "lighter";
-  const lg = ctx.createRadialGradient(VIEW_W/2, 230 + bob, 20, VIEW_W/2, 230 + bob, 320);
-  lg.addColorStop(0, "rgba(150,110,255,.28)");
-  lg.addColorStop(1, "rgba(80,50,200,0)");
-  ctx.fillStyle = lg;
-  ctx.beginPath(); ctx.arc(VIEW_W/2, 230 + bob, 320, 0, Math.PI*2); ctx.fill();
+  const t = titleT;
+  // ── 전용 배경 씬 (게임 월드 대신 불투명하게 덮음) ──
+  const sky = ctx.createLinearGradient(0, 0, 0, VIEW_H);
+  sky.addColorStop(0, "#0a0820"); sky.addColorStop(0.45, "#141033"); sky.addColorStop(1, "#241a42");
+  ctx.fillStyle = sky; ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+  // 별
+  ctx.fillStyle = "#fff";
+  for(let i=0;i<110;i++){
+    const sx=(i*173)%VIEW_W, sy=(i*97)%Math.floor(VIEW_H*0.72);
+    ctx.globalAlpha=0.2+0.6*Math.abs(Math.sin(t*0.8+i));
+    ctx.fillRect(sx, sy, (i%9===0)?2:1, (i%9===0)?2:1);
+  }
+  ctx.globalAlpha=1;
+  // 달 + 후광
+  ctx.save(); ctx.globalCompositeOperation="lighter";
+  const mg=ctx.createRadialGradient(1000,150,10,1000,150,150);
+  mg.addColorStop(0,"rgba(220,220,255,.35)"); mg.addColorStop(1,"rgba(120,120,220,0)");
+  ctx.fillStyle=mg; ctx.beginPath(); ctx.arc(1000,150,150,0,Math.PI*2); ctx.fill(); ctx.restore();
+  ctx.fillStyle="#eae6ff"; ctx.beginPath(); ctx.arc(1000,150,50,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle="#141033"; ctx.beginPath(); ctx.arc(1022,138,44,0,Math.PI*2); ctx.fill();
+  // 원경 산 실루엣
+  ctx.fillStyle="#181433";
+  ctx.beginPath(); ctx.moveTo(0,540);
+  for(let x=0;x<=VIEW_W;x+=80) ctx.lineTo(x, 480 + Math.sin(x*0.004)*60 + (x*0.03));
+  ctx.lineTo(VIEW_W,VIEW_H); ctx.lineTo(0,VIEW_H); ctx.closePath(); ctx.fill();
+  // 원경 학교 실루엣 (중앙 시계탑)
+  ctx.save(); ctx.translate(VIEW_W/2, 0);
+  ctx.fillStyle="#221b40";
+  ctx.fillRect(-190,470,380,150);
+  ctx.fillRect(-40,360,80,260);                       // 시계탑
+  ctx.beginPath(); ctx.moveTo(-52,360); ctx.lineTo(0,300); ctx.lineTo(52,360); ctx.closePath(); ctx.fill();   // 첨탑
+  ctx.beginPath(); ctx.moveTo(-210,470); ctx.lineTo(-150,430); ctx.lineTo(-90,470); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(210,470); ctx.lineTo(150,430); ctx.lineTo(90,470); ctx.closePath(); ctx.fill();
+  // 시계
+  ctx.fillStyle="#f2c46b"; ctx.beginPath(); ctx.arc(0,392,13,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle="#221b40"; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(0,392); ctx.lineTo(0,384); ctx.moveTo(0,392); ctx.lineTo(6,392); ctx.stroke();
+  // 창문 불빛
+  ctx.fillStyle="rgba(255,205,120,.85)";
+  for(let r=0;r<3;r++)for(let c=0;c<8;c++){ if((r+c+Math.floor(t))%3===0){ ctx.globalAlpha=0.5+0.5*Math.abs(Math.sin(t+r+c)); ctx.fillRect(-160+c*42, 486+r*40, 12, 18);} }
+  ctx.globalAlpha=1; ctx.restore();
+  // 바닥 안개
+  const fg=ctx.createLinearGradient(0,560,0,VIEW_H);
+  fg.addColorStop(0,"rgba(40,30,70,0)"); fg.addColorStop(1,"rgba(30,22,55,.9)");
+  ctx.fillStyle=fg; ctx.fillRect(0,560,VIEW_W,VIEW_H-560);
+  // 떠오르는 마법 불티
+  ctx.save(); ctx.globalCompositeOperation="lighter";
+  for(let i=0;i<24;i++){
+    const px=(i*271 + t*18)%VIEW_W;
+    const py=VIEW_H-((i*151 + t*36)%(VIEW_H+80));
+    ctx.fillStyle=i%2?"rgba(255,180,90,.5)":"rgba(150,120,255,.5)";
+    ctx.beginPath(); ctx.arc(px, py, 1.5+((i*7)%3), 0, Math.PI*2); ctx.fill();
+  }
   ctx.restore();
-  ctx.font = "bold 20px sans-serif"; ctx.fillStyle = "#8be9fd";
-  ctx.fillText("마 법 학 교", VIEW_W/2, 180 + bob);
-  ctx.font = "900 74px sans-serif";
-  ctx.lineWidth = 10; ctx.strokeStyle = "rgba(0,0,0,.7)";
-  ctx.strokeText("아르카나 아카데미", VIEW_W/2, 258 + bob);
-  const tg = ctx.createLinearGradient(0, 210, 0, 270);
-  tg.addColorStop(0, "#ffe9c9"); tg.addColorStop(0.55, "#ffb35c"); tg.addColorStop(1, "#ff7b3a");
-  ctx.fillStyle = tg;
-  ctx.fillText("아르카나 아카데미", VIEW_W/2, 258 + bob);
-  ctx.font = "15px sans-serif"; ctx.fillStyle = "#94a3b8";
-  ctx.fillText("— 마법을 배우고, 시험을 넘고, 나만의 마법사를 키우는 도트 액션 RPG —", VIEW_W/2, 300 + bob);
 
-  // 캐릭터 (도트 스프라이트 확대)
-  const fr = MAGE.frames.idle[Math.floor(titleT * 2.5) % 2];
   ctx.save();
-  ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(mageSheet, fr*MAGE.w, 0, MAGE.w, MAGE.h, VIEW_W/2 - 74, 322, MAGE.w*4.2, MAGE.h*4.2);
+  ctx.textAlign="center";
+  const bob=Math.sin(t*1.2)*5;
+  // 로고 후광
+  ctx.save(); ctx.globalCompositeOperation="lighter";
+  const lg=ctx.createRadialGradient(VIEW_W/2,210+bob,20,VIEW_W/2,210+bob,300);
+  lg.addColorStop(0,"rgba(255,150,80,.16)"); lg.addColorStop(1,"rgba(120,80,220,0)");
+  ctx.fillStyle=lg; ctx.beginPath(); ctx.arc(VIEW_W/2,210+bob,300,0,Math.PI*2); ctx.fill(); ctx.restore();
+  // 소제목
+  headerText("A R C A N A   A C A D E M Y", VIEW_W/2, 128+bob, 15, "#8fb8d8", 4, "center");
+  // 로고
+  ctx.font='800 76px "Trebuchet MS","Segoe UI",sans-serif';
+  if("letterSpacing" in ctx) ctx.letterSpacing="2px";
+  ctx.lineWidth=8; ctx.strokeStyle="rgba(10,6,20,.55)"; ctx.strokeText("아르카나 아카데미",VIEW_W/2,210+bob);
+  const tg=ctx.createLinearGradient(0,160,0,225);
+  tg.addColorStop(0,"#fff2d8"); tg.addColorStop(0.5,"#ffc878"); tg.addColorStop(1,"#ff9040");
+  ctx.fillStyle=tg; ctx.fillText("아르카나 아카데미",VIEW_W/2,210+bob);
+  if("letterSpacing" in ctx) ctx.letterSpacing="0px";
+  // 태그라인
+  ctx.font="14px 'Trebuchet MS',sans-serif"; ctx.fillStyle="rgba(200,208,224,.7)";
+  ctx.fillText("마법을 배우고 · 세계를 탐험하고 · 나만의 마법사를 키운다", VIEW_W/2, 250+bob);
+
+  // 캐릭터
+  const fr=MAGE.frames.idle[Math.floor(t*2.5)%2];
+  ctx.save(); ctx.imageSmoothingEnabled=false;
+  ctx.globalAlpha=0.35; ctx.fillStyle="#000"; ctx.beginPath(); ctx.ellipse(VIEW_W/2, 452, 40, 8, 0, 0, Math.PI*2); ctx.fill(); ctx.globalAlpha=1;
+  ctx.drawImage(mageSheet, fr*MAGE.w, 0, MAGE.w, MAGE.h, VIEW_W/2-70, 300+bob*0.5, MAGE.w*4, MAGE.h*4);
   ctx.restore();
 
   // 버튼
-  const hasSave = (()=>{ try{ return !!localStorage.getItem(SAVE_KEY); }catch(e){ return false; } })();
-  drawTitleBtn(TITLE_BTN.play, hasSave ? "이어하기" : "게임 시작", "#7c3aed", "#a78bfa", true);
-  drawTitleBtn(TITLE_BTN.opts, "옵션", "#1e293b", "#475569", false);
+  const hasSave=(()=>{try{return !!localStorage.getItem(SAVE_KEY);}catch(e){return false;}})();
+  drawTitleBtn(TITLE_BTN.play, hasSave?"이어하기":"모험 시작", true);
+  drawTitleBtn(TITLE_BTN.opts, "옵션", false);
 
-  ctx.font = "12px sans-serif"; ctx.fillStyle = "rgba(148,163,184,.6)";
-  ctx.fillText("Enter / Space / 클릭으로 시작", VIEW_W/2, 612);
-  ctx.fillText("프로토타입 v0.19 — 아르카나 아카데미", VIEW_W/2, VIEW_H - 20);
+  ctx.textAlign="center";
+  ctx.font="12px sans-serif"; ctx.fillStyle="rgba(160,170,190,.55)";
+  ctx.fillText("Enter · Space · 클릭으로 시작", VIEW_W/2, 616);
+  headerText("v0.20", VIEW_W - 40, VIEW_H - 20, 11, "rgba(150,160,180,.4)", 1, "right");
   ctx.restore();
 
   if(showOptions) renderOptions();
 }
 
-function drawTitleBtn(r, label, col, border, big){
+function drawTitleBtn(r, label, primary){
   const hover = inRect(mouse.x, mouse.y, r);
   ctx.save();
-  ctx.fillStyle = hover ? border : col;
-  roundRect(r.x, r.y, r.w, r.h, 12); ctx.fill();
-  ctx.strokeStyle = border; ctx.lineWidth = 2.5;
-  roundRect(r.x, r.y, r.w, r.h, 12); ctx.stroke();
-  ctx.textAlign = "center";
-  ctx.font = `bold ${big ? 22 : 18}px sans-serif`;
-  ctx.fillStyle = "#fff";
-  ctx.fillText(label, r.x + r.w/2, r.y + r.h/2 + (big ? 8 : 6));
+  const g = ctx.createLinearGradient(0, r.y, 0, r.y+r.h);
+  if(primary){ g.addColorStop(0, hover?"#8b5cf6":"#7047d0"); g.addColorStop(1, hover?"#6d3fc0":"#5836a8"); }
+  else { g.addColorStop(0, hover?"rgba(50,56,80,.95)":"rgba(30,34,52,.9)"); g.addColorStop(1,"rgba(18,20,34,.92)"); }
+  ctx.fillStyle="rgba(0,0,0,.4)"; roundRect(r.x, r.y+3, r.w, r.h, 11); ctx.fill();
+  ctx.fillStyle=g; roundRect(r.x, r.y, r.w, r.h, 11); ctx.fill();
+  ctx.strokeStyle= primary ? (hover?"#c4b5fd":"#9a7cf0") : (hover?"#7b88a6":"#4a536a");
+  ctx.lineWidth=1.5; roundRect(r.x+1, r.y+1, r.w-2, r.h-2, 10); ctx.stroke();
+  if(hover){ ctx.save(); ctx.globalCompositeOperation="lighter";
+    ctx.fillStyle= primary?"rgba(160,120,255,.12)":"rgba(140,160,200,.08)"; roundRect(r.x,r.y,r.w,r.h,11); ctx.fill(); ctx.restore(); }
+  ctx.textAlign="center";
+  headerText(label, r.x+r.w/2, r.y+r.h/2+ (primary?7:6), primary?21:16, primary?"#fff":"#c8d0e0", 1.5, "center");
   ctx.restore();
 }
 
@@ -3884,13 +4068,9 @@ function renderOptions(){
   ctx.save();
   ctx.fillStyle = "rgba(0,0,0,.55)";
   ctx.fillRect(0, 0, VIEW_W, VIEW_H);
-  ctx.fillStyle = "rgba(14,17,32,.97)";
-  roundRect(px2, py, PW, PH, 14); ctx.fill();
-  ctx.strokeStyle = "#475569"; ctx.lineWidth = 2;
-  roundRect(px2, py, PW, PH, 14); ctx.stroke();
+  uiPanel(px2, py, PW, PH, { accent:"#4a86a0" });
   ctx.textAlign = "left";
-  ctx.font = "bold 20px sans-serif"; ctx.fillStyle = "#8be9fd";
-  ctx.fillText("옵션", px2 + 30, py + 42);
+  headerText("옵션", px2 + 30, py + 42, 20, "#8be9fd", 1);
 
   OPT_ROWS.forEach((row, i)=>{
     const r = { x: px2 + 30, y: py + 70 + i*64, w: PW - 60, h: 48 };
@@ -4008,11 +4188,7 @@ function renderWorldMap(){
   ctx.save();
   ctx.fillStyle = "rgba(0,0,0,.6)";
   ctx.fillRect(0, 0, VIEW_W, VIEW_H);
-  // 양피지 느낌 패널
-  ctx.fillStyle = "rgba(18,16,28,.97)";
-  roundRect(px2, py, PW, PH, 16); ctx.fill();
-  ctx.strokeStyle = "#8a683d"; ctx.lineWidth = 3;
-  roundRect(px2, py, PW, PH, 16); ctx.stroke();
+  uiPanel(px2, py, PW, PH, { accent:"#b08a3a", r:16 });
   ctx.strokeStyle = "rgba(138,104,61,.35)"; ctx.lineWidth = 1;
   roundRect(px2 + 10, py + 10, PW - 20, PH - 20, 12); ctx.stroke();
 
@@ -4942,28 +5118,36 @@ function renderHUD(){
   ctx.save();
   ctx.textAlign = "left";
 
-  ctx.fillStyle = "rgba(10,12,24,.72)";
-  roundRect(16, 14, 300, 96, 10); ctx.fill();
-
-  ctx.font = "bold 15px sans-serif";
-  ctx.fillStyle = "#e2e8f0";
-  ctx.fillText(`Lv.${pl.level}  견습 마법사`, 30, 38);
+  // 플레이어 플레이트
+  uiPanel(16, 14, 306, 104, { accent:"#6b5cc0", r:12 });
+  // 랭크 뱃지
   const ov = overallRank();
-  ctx.fillStyle = rankColor(ov);
-  ctx.fillText(`종합 ${ov}`, 232, 38);
-
-  bar(30, 48, 270, 14, pl.hp / maxHp(), "#ef4444", "#7f1d1d");
-  ctx.font = "bold 11px sans-serif"; ctx.fillStyle = "#fff";
-  ctx.fillText(`HP ${Math.ceil(pl.hp)} / ${maxHp()}`, 36, 59);
-
-  bar(30, 68, 270, 14, pl.mp / maxMp(), "#3b82f6", "#1e3a8a");
-  ctx.fillStyle = "#fff";
-  ctx.fillText(`MP ${Math.floor(pl.mp)} / ${maxMp()}`, 36, 79);
-
-  const need = expNeed(pl.level);
-  bar(30, 88, 270, 9, pl.exp / need, "#a3e635", "#3f6212");
-  ctx.fillStyle = "#d9f99d"; ctx.font = "10px sans-serif";
-  ctx.fillText(`EXP ${pl.exp} / ${need}`, 36, 96);
+  const rc = rankColor(ov);
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,.4)"; roundRect(28, 26, 46, 46, 9); ctx.fill();
+  ctx.strokeStyle = rc; ctx.lineWidth = 2; roundRect(28, 26, 46, 46, 9); ctx.stroke();
+  ctx.textAlign = "center"; ctx.font = "800 20px 'Trebuchet MS',sans-serif"; ctx.fillStyle = rc;
+  ctx.fillText(ov, 51, 56);
+  ctx.font = "9px sans-serif"; ctx.fillStyle = UI.dim; ctx.fillText("RANK", 51, 66);
+  ctx.restore();
+  // 이름 · 레벨
+  ctx.textAlign = "left";
+  headerText("견습 마법사", 84, 40, 15, UI.ink, 0.5);
+  ctx.font = "bold 12px sans-serif"; ctx.fillStyle = UI.gold; ctx.fillText(`Lv.${pl.level}`, 84, 58);
+  // HP/MP/EXP 게이지 (아이콘 + 광택바)
+  const gx = 130, gw = 176;
+  ctx.font = "bold 10px sans-serif"; ctx.textAlign = "left";
+  ctx.fillStyle = "#ff8a8a"; ctx.fillText("HP", 84, 78);
+  uiBar(gx, 68, gw, 11, pl.hp/maxHp(), "#ff6b6b", "#c0392b");
+  ctx.fillStyle = "#8ab6ff"; ctx.fillText("MP", 84, 94);
+  uiBar(gx, 84, gw, 11, pl.mp/maxMp(), "#5aa0ff", "#2456b0");
+  ctx.fillStyle = "#c5e88a"; ctx.font = "bold 9px sans-serif"; ctx.fillText("EXP", 84, 108);
+  uiBar(gx, 101, gw, 6, pl.exp/expNeed(pl.level), "#a3e635", "#4d7c14");
+  // 수치 (바 위 우측)
+  ctx.textAlign = "right"; ctx.font = "bold 9px sans-serif"; ctx.fillStyle = "rgba(255,255,255,.85)";
+  ctx.fillText(`${Math.ceil(pl.hp)}/${maxHp()}`, gx+gw-4, 77);
+  ctx.fillText(`${Math.floor(pl.mp)}/${maxMp()}`, gx+gw-4, 93);
+  ctx.textAlign = "left";
 
   // 미니맵 (우상단 — 맵 이름 포함)
   renderMinimap();
@@ -5021,37 +5205,39 @@ function renderHUD(){
   {
     const q = curQuest();
     ctx.textAlign = "left";
-    ctx.fillStyle = "rgba(10,12,24,.72)";
-    roundRect(VIEW_W - 316, 118, 300, 70, 10); ctx.fill();
-    ctx.font = "bold 13px sans-serif";
-    ctx.fillStyle = "#fbbf24";
-    ctx.fillText(q ? `퀘스트 — ${q.name}` : "퀘스트", VIEW_W - 302, 140);
-    ctx.font = "12px sans-serif"; ctx.fillStyle = "#cbd5e1";
+    uiPanel(VIEW_W - 320, 118, 304, 74, { accent:"#b08a3a", r:11, corners:false });
+    // 좌측 악센트 바
+    ctx.fillStyle = "#f2c46b"; ctx.fillRect(VIEW_W - 318, 124, 3, 62);
+    headerText("QUEST", VIEW_W - 306, 138, 10, "#c9a24a", 2);
+    ctx.font = "bold 13px sans-serif"; ctx.fillStyle = "#ffe0a0";
+    ctx.fillText(q ? q.name : "완료", VIEW_W - 252, 138);
+    ctx.font = "11px sans-serif"; ctx.fillStyle = UI.dim;
     if(q){
-      ctx.fillText(q.desc, VIEW_W - 302, 160);
-      bar(VIEW_W - 302, 168, 200, 8, questState.prog / q.need, "#fbbf24", "#3b3a2a");
-      ctx.fillStyle = "#fde68a"; ctx.font = "bold 12px sans-serif";
-      ctx.fillText(`${Math.floor(questState.prog)} / ${q.need}`, VIEW_W - 94, 176);
+      ctx.fillText(clipText(q.desc, 40), VIEW_W - 306, 160);
+      uiBar(VIEW_W - 306, 170, 210, 7, questState.prog/q.need, "#f2c46b", "#8a6420");
+      ctx.textAlign = "right"; ctx.fillStyle = "#ffe6b0"; ctx.font = "bold 11px sans-serif";
+      ctx.fillText(`${Math.floor(questState.prog)} / ${q.need}`, VIEW_W - 20, 178);
+      ctx.textAlign = "left";
     }else{
-      ctx.fillText("모든 퀘스트 완료! (다음 업데이트에서 계속)", VIEW_W - 302, 162);
+      ctx.fillText("모든 퀘스트 완료!", VIEW_W - 306, 162);
     }
   }
-
   // 수업 트래커
   {
     const info = nextLessonInfo();
     if(info){
-      ctx.fillStyle = "rgba(10,12,24,.72)";
-      roundRect(VIEW_W - 316, 196, 300, 52, 10); ctx.fill();
-      ctx.font = "bold 13px sans-serif"; ctx.fillStyle = "#8be9fd";
+      uiPanel(VIEW_W - 320, 200, 304, 52, { accent:"#4a86a0", r:11, corners:false });
+      ctx.fillStyle = "#8be9fd"; ctx.fillRect(VIEW_W - 318, 206, 3, 40);
+      headerText("CLASS", VIEW_W - 306, 220, 10, "#6bb8d0", 2);
+      ctx.font = "bold 12px sans-serif"; ctx.fillStyle = "#bfeeff";
       if(info.type === "active"){
-        ctx.fillText(`수업 — ${info.al.name}`, VIEW_W - 302, 216);
-        ctx.font = "12px sans-serif"; ctx.fillStyle = "#cbd5e1";
-        ctx.fillText(`${info.al.desc}  (${info.al.st.prog}/${info.al.need})`, VIEW_W - 302, 236);
+        ctx.fillText(info.al.name, VIEW_W - 252, 220);
+        ctx.font = "11px sans-serif"; ctx.fillStyle = UI.dim;
+        ctx.fillText(clipText(info.al.desc, 30) + `  (${info.al.st.prog}/${info.al.need})`, VIEW_W - 306, 240);
       }else{
-        ctx.fillText("수업 가능!", VIEW_W - 302, 216);
-        ctx.font = "12px sans-serif"; ctx.fillStyle = "#cbd5e1";
-        ctx.fillText(`본관 강의실 — ${info.t.name} (${info.t.title})`, VIEW_W - 302, 236);
+        ctx.fillText("수업 가능!", VIEW_W - 252, 220);
+        ctx.font = "11px sans-serif"; ctx.fillStyle = UI.dim;
+        ctx.fillText(clipText(`${info.t.name} · ${info.t.title}`, 30), VIEW_W - 306, 240);
       }
     }
   }
@@ -5109,26 +5295,29 @@ function renderHUD(){
   // 도움말
   if(showHelp){
     ctx.textAlign = "left";
-    ctx.fillStyle = "rgba(10,12,24,.74)";
-    roundRect(16, VIEW_H - 300, 400, 280, 10); ctx.fill();
-    ctx.font = "bold 13px sans-serif"; ctx.fillStyle = "#8be9fd";
-    ctx.fillText("조작법 (H: 접기/펼치기)", 30, VIEW_H - 276);
-    ctx.font = "13px sans-serif"; ctx.fillStyle = "#cbd5e1";
-    const lines = [
-      "← → 이동  /  Space 점프(공중 한 번 더=이중점프)",
-      "↓+Space 아래로  /  Shift 대시  /  E 대화·수업·사당·화로",
-      "Z 불티  X 홀드 화염구  C 장판  V 랜스  S 노바",
-      "Q(홀드) 인페르노 — 1식  /  R 멸화 — 2식",
-      "── 이동 술식(세계에서 사당·스승으로 습득) ──",
-      "벽+Space 벽점프  /  F 도깨비불(어둠)  /  G 유성 질주",
-      "낙하 중 Space 유지 = 활공  /  B 섬화(점멸)",
-      "※ 마법은 수업(E), 이동 술식은 탐험(사당)으로!",
-      "Tab 학생 수첩  /  M 월드맵  /  자동 저장(F2×2 초기화)",
+    const HW = 430, HH = 250, hx = 16, hy = VIEW_H - HH - 16;
+    uiPanel(hx, hy, HW, HH, { accent:"#4a86a0", r:12 });
+    headerText("조작법", hx+22, hy+30, 16, "#8be9fd", 1);
+    ctx.font="11px sans-serif"; ctx.fillStyle=UI.faint; ctx.textAlign="right";
+    ctx.fillText("H 로 닫기", hx+HW-20, hy+30); ctx.textAlign="left";
+    const groups = [
+      ["이동", ["← →  이동", "Space  점프 · 공중 재점프", "↓+Space  아래로 · Shift  대시"]],
+      ["전투 마법", ["Z 불티  X 화염구  C 장판", "V 랜스  S 노바  Q 인페르노  R 멸화"]],
+      ["이동 술식 (탐험 습득)", ["벽+Space 벽점프 · F 도깨비불", "G 유성 질주 · 낙하 중 Space 활공 · B 섬화"]],
+      ["기타", ["E 대화·수업·사당 · Tab 수첩 · M 월드맵"]],
     ];
-    lines.forEach((l, i)=> ctx.fillText(l, 30, VIEW_H - 252 + i*22));
+    let yy = hy + 54;
+    for(const [title, rows] of groups){
+      headerText(title, hx+22, yy, 11, UI.gold, 1.5);
+      yy += 18;
+      ctx.font="12px 'Trebuchet MS',sans-serif"; ctx.fillStyle="#c0c8da";
+      for(const r of rows){ ctx.fillText(r, hx+30, yy); yy += 18; }
+      yy += 6;
+    }
   }else{
-    ctx.font = "12px sans-serif"; ctx.fillStyle = "rgba(203,213,225,.5)";
-    ctx.fillText("H: 조작법", 20, VIEW_H - 16);
+    ctx.textAlign = "left";
+    ctx.font = "11px sans-serif"; ctx.fillStyle = "rgba(180,190,210,.45)";
+    ctx.fillText("H  조작법", 22, VIEW_H - 16);
   }
 
   if(showBook) renderBook();
@@ -5137,20 +5326,46 @@ function renderHUD(){
   if(showWorldMap) renderWorldMap();
   if(learnUI) renderLearn();
 
-  // 대화창
+  // 대화창 (네임플레이트 + 타이프라이터)
   if(dialog){
-    ctx.textAlign = "left";
-    ctx.fillStyle = "rgba(10,12,24,.92)";
-    roundRect(VIEW_W/2 - 370, VIEW_H - 214, 740, 118, 12); ctx.fill();
-    ctx.strokeStyle = "#7c5cbf"; ctx.lineWidth = 2;
-    roundRect(VIEW_W/2 - 370, VIEW_H - 214, 740, 118, 12); ctx.stroke();
-    ctx.font = "bold 15px sans-serif"; ctx.fillStyle = "#c4b5fd";
-    ctx.fillText(dialog.speaker, VIEW_W/2 - 344, VIEW_H - 184);
-    ctx.font = "15px sans-serif"; ctx.fillStyle = "#e2e8f0";
-    ctx.fillText(dialog.lines[dialog.i], VIEW_W/2 - 344, VIEW_H - 152);
-    ctx.textAlign = "right";
-    ctx.font = "12px sans-serif"; ctx.fillStyle = "#64748b";
-    ctx.fillText(`E ▸  (${dialog.i+1}/${dialog.lines.length})`, VIEW_W/2 + 344, VIEW_H - 112);
+    const bw = 760, bx = VIEW_W/2 - bw/2, by = VIEW_H - 176, bh = 118;
+    uiPanel(bx, by, bw, bh, { accent:"#7c5cbf", r:14 });
+    // 초상 스와치 (말하는 이 색)
+    const spk = dialog.speaker || "";
+    const pcol = spk.includes("리나")?"#f9a8d4": spk.includes("테오")?"#93c5fd": spk.includes("아그니스")?"#c4b5fd":
+                 spk.includes("발더스")||spk.includes("대마도사")?"#ff8a5c": spk.includes("유령")||spk.includes("유키네")?"#a5b0c8":
+                 spk.includes("브란")?"#ff9d5c": spk.includes("사서")?"#a0d8c0":"#8be9fd";
+    ctx.save();
+    ctx.fillStyle = "rgba(0,0,0,.35)"; roundRect(bx+18, by+18, 60, 82, 8); ctx.fill();
+    ctx.strokeStyle = pcol; ctx.lineWidth = 2; roundRect(bx+18, by+18, 60, 82, 8); ctx.stroke();
+    const gg = ctx.createRadialGradient(bx+48, by+55, 4, bx+48, by+55, 30);
+    gg.addColorStop(0, pcol); gg.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.save(); ctx.globalCompositeOperation="lighter"; ctx.fillStyle=gg; ctx.beginPath(); ctx.arc(bx+48,by+55,30,0,Math.PI*2); ctx.fill(); ctx.restore();
+    ctx.fillStyle = pcol; ctx.textAlign="center"; ctx.font="26px serif"; ctx.fillText("✦", bx+48, by+66);
+    ctx.restore();
+    // 네임플레이트 탭
+    ctx.textAlign="left";
+    if(spk){
+      ctx.font="bold 13px sans-serif"; const nw=ctx.measureText(spk).width+24;
+      ctx.fillStyle="rgba(20,16,34,.96)"; roundRect(bx+92, by-14, nw, 26, 7); ctx.fill();
+      ctx.strokeStyle=pcol; ctx.lineWidth=1.5; roundRect(bx+92, by-14, nw, 26, 7); ctx.stroke();
+      ctx.fillStyle=pcol; ctx.fillText(spk, bx+104, by+4);
+    }
+    // 본문 (타이프라이터)
+    const full = dialog.lines[dialog.i] || "";
+    const nchar = Math.min(full.length, Math.floor((performance.now()-dialog.t0)/20));
+    ctx.font="15px 'Trebuchet MS',sans-serif"; ctx.fillStyle="#e6e9f2";
+    ctx.fillText(full.slice(0, nchar), bx+100, by+42);
+    // 진행 표시 / 계속 캐럿
+    ctx.textAlign="right";
+    if(nchar >= full.length){
+      const blink = (Math.sin(performance.now()/200)>0)?1:0.3;
+      ctx.globalAlpha=blink; ctx.fillStyle=pcol; ctx.font="bold 14px sans-serif";
+      ctx.fillText("▸ E", bx+bw-24, by+bh-16); ctx.globalAlpha=1;
+    }
+    ctx.fillStyle="rgba(160,170,190,.5)"; ctx.font="11px sans-serif";
+    ctx.fillText(`${dialog.i+1} / ${dialog.lines.length}`, bx+bw-24, by+20);
+    ctx.textAlign="left";
   }
 
   // 사망 오버레이
@@ -5165,8 +5380,6 @@ function renderHUD(){
   }
 
   ctx.textAlign = "right";
-  ctx.font = "11px sans-serif"; ctx.fillStyle = "rgba(148,163,184,.55)";
-  ctx.fillText("아르카나 아카데미 프로토타입 v0.19 — 대륙 확장 (치트: YEMO)", VIEW_W - 14, 22);
   if(saveFlash > 0){
     ctx.globalAlpha = Math.min(1, saveFlash);
     ctx.font = "12px sans-serif"; ctx.fillStyle = "#4ade80";
@@ -5182,14 +5395,9 @@ function renderBook(){
   ctx.save();
   ctx.fillStyle = "rgba(0,0,0,.55)";
   ctx.fillRect(0, 0, VIEW_W, VIEW_H);
-  ctx.fillStyle = "rgba(14,17,32,.96)";
-  roundRect(px2, py, PW, PH, 14); ctx.fill();
-  ctx.strokeStyle = "#475569"; ctx.lineWidth = 2;
-  roundRect(px2, py, PW, PH, 14); ctx.stroke();
-
+  uiPanel(px2, py, PW, PH, { accent:"#6b5cc0" });
   ctx.textAlign = "left";
-  ctx.font = "bold 20px sans-serif"; ctx.fillStyle = "#8be9fd";
-  ctx.fillText("학생 수첩", px2 + 28, py + 40);
+  headerText("학생 수첩", px2 + 28, py + 40, 20, "#8be9fd", 1);
   // 페이지 탭
   ctx.font = "bold 13px sans-serif";
   ctx.fillStyle = bookPage === 0 ? "#fbbf24" : "#64748b";
@@ -5407,11 +5615,7 @@ function renderLearn(){
   const { PW, PH, px, py } = learnPanel();
   ctx.save();
   ctx.fillStyle = "rgba(0,0,0,.6)"; ctx.fillRect(0, 0, VIEW_W, VIEW_H);
-  // 책 느낌 배경
-  ctx.fillStyle = "rgba(30,22,14,.98)";
-  roundRect(px, py, PW, PH, 14); ctx.fill();
-  ctx.strokeStyle = "#8a6a3a"; ctx.lineWidth = 2;
-  roundRect(px, py, PW, PH, 14); ctx.stroke();
+  uiPanel(px, py, PW, PH, { accent:"#b08a3a" });
   // 가운데 제본선
   ctx.strokeStyle = "rgba(138,106,58,.35)"; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(px + PW/2, py + 60); ctx.lineTo(px + PW/2, py + PH - 20); ctx.stroke();
@@ -5468,11 +5672,9 @@ function renderForge(){
   const PW = 760, PH = 540, px2 = (VIEW_W-PW)/2, py = (VIEW_H-PH)/2;
   ctx.save();
   ctx.fillStyle = "rgba(0,0,0,.6)"; ctx.fillRect(0,0,VIEW_W,VIEW_H);
-  ctx.fillStyle = "rgba(24,16,12,.98)"; roundRect(px2, py, PW, PH, 14); ctx.fill();
-  ctx.strokeStyle = "#7a4a2e"; ctx.lineWidth = 2; roundRect(px2, py, PW, PH, 14); ctx.stroke();
+  uiPanel(px2, py, PW, PH, { accent:"#c06a2e" });
   ctx.textAlign = "left";
-  ctx.font = "bold 20px sans-serif"; ctx.fillStyle = "#ff8040";
-  ctx.fillText("모루골 각인 공방 — 마도각인", px2 + 28, py + 40);
+  headerText("모루골 각인 공방 — 마도각인", px2 + 28, py + 40, 20, "#ff8040", 1);
   ctx.textAlign = "right";
   ctx.font = "bold 15px sans-serif"; ctx.fillStyle = "#a5f3fc";
   ctx.fillText("💎 마력 결정 " + player.crystals, px2 + PW - 28, py + 40);
@@ -5508,14 +5710,9 @@ function renderTrainer(){
   ctx.save();
   ctx.fillStyle = "rgba(0,0,0,.55)";
   ctx.fillRect(0, 0, VIEW_W, VIEW_H);
-  ctx.fillStyle = "rgba(20,14,14,.96)";
-  roundRect(px2, py, PW, PH, 14); ctx.fill();
-  ctx.strokeStyle = "#7a2e2e"; ctx.lineWidth = 2;
-  roundRect(px2, py, PW, PH, 14); ctx.stroke();
-
+  uiPanel(px2, py, PW, PH, { accent:"#a03a3a" });
   ctx.textAlign = "left";
-  ctx.font = "bold 20px sans-serif"; ctx.fillStyle = "#ff9d4d";
-  ctx.fillText("훈련 교관 — 스킬 강화", px2 + 28, py + 40);
+  headerText("훈련 교관 — 스킬 강화", px2 + 28, py + 40, 20, "#ff9d4d", 1);
   ctx.font = "12px sans-serif"; ctx.fillStyle = "#94a3b8";
   ctx.fillText("숫자 [1~7] 키로 강화  ·  E/Tab 닫기   ※ 지금은 무료 — 추후 수업·스토리 연동", px2 + 28, py + 62);
 
@@ -5557,42 +5754,51 @@ function renderTrainer(){
 }
 
 function drawSkillSlot(x, y, key, name, cdRatio, usable, locked){
-  const S = 56;
+  const S = 56, cx = x + S/2, cy = y + S/2;
   ctx.save();
-  ctx.fillStyle = "rgba(10,12,24,.78)";
-  roundRect(x, y, S, S, 8); ctx.fill();
-  ctx.strokeStyle = locked ? "#334155" : usable ? "#64748b" : "#7f1d1d";
-  ctx.lineWidth = 2;
-  roundRect(x, y, S, S, 8); ctx.stroke();
+  // 프레임 (그라데이션 + 이중 테두리)
+  const bg = ctx.createLinearGradient(0, y, 0, y+S);
+  bg.addColorStop(0, "rgba(30,34,52,.92)"); bg.addColorStop(1, "rgba(12,14,26,.94)");
+  ctx.fillStyle = bg; roundRect(x, y, S, S, 9); ctx.fill();
+  ctx.strokeStyle = "rgba(0,0,0,.6)"; ctx.lineWidth = 3; roundRect(x, y, S, S, 9); ctx.stroke();
+  ctx.strokeStyle = locked ? "#39424f" : usable ? "#7b88a6" : "#8a3a3a";
+  ctx.lineWidth = 1.5; roundRect(x+1.5, y+1.5, S-3, S-3, 8); ctx.stroke();
   if(locked){
-    ctx.strokeStyle = "#94a3b8"; ctx.lineWidth = 2.5;
-    ctx.beginPath(); ctx.arc(x + S/2, y + S/2 - 10, 6, Math.PI, 0); ctx.stroke();
-    ctx.fillStyle = "#94a3b8";
-    ctx.fillRect(x + S/2 - 8, y + S/2 - 10, 16, 13);
+    // 자물쇠
+    ctx.strokeStyle = "#6a7488"; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(cx, cy - 8, 6, Math.PI, 0); ctx.stroke();
+    ctx.fillStyle = "#6a7488"; roundRect(cx - 9, cy - 8, 18, 14, 3); ctx.fill();
   }else{
     const iconCol = name==="불티" ? "#ffb35c" : name==="화염구" ? "#ff6b3a" :
                     name==="화염장판" ? "#ff8c3a" : name==="랜스" ? "#ffd23e" :
-                    name==="노바" ? "#ff5040" : name==="인페르노" ? "#ff4d00" : "#8ab6ff";
-    ctx.fillStyle = usable ? iconCol : "#555";
-    ctx.beginPath(); ctx.arc(x + S/2, y + S/2 - 4, 13, 0, Math.PI*2); ctx.fill();
+                    name==="노바" ? "#ff5040" : name==="인페르노" ? "#ff4d00" : name==="멸화" ? "#c04dff" : "#8ab6ff";
+    // 아이콘 오브 (글로우 + 구체)
+    ctx.save(); ctx.globalCompositeOperation = "lighter";
+    const gg = ctx.createRadialGradient(cx, cy-2, 1, cx, cy-2, 18);
+    gg.addColorStop(0, usable ? iconCol : "rgba(80,80,90,.5)"); gg.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = gg; ctx.beginPath(); ctx.arc(cx, cy-2, 18, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+    const og = ctx.createRadialGradient(cx-4, cy-8, 1, cx, cy-2, 14);
+    og.addColorStop(0, usable ? shade(iconCol, 0.4) : "#5a5a62");
+    og.addColorStop(1, usable ? shade(iconCol, -0.3) : "#3a3a42");
+    ctx.fillStyle = og; ctx.beginPath(); ctx.arc(cx, cy-2, 13, 0, Math.PI*2); ctx.fill();
+    // 쿨다운 스윕
     const k = clamp(cdRatio, 0, 1);
     if(k > 0){
-      ctx.fillStyle = "rgba(0,0,0,.62)";
-      ctx.beginPath();
-      ctx.moveTo(x + S/2, y + S/2);
-      ctx.arc(x + S/2, y + S/2, S*0.72, -Math.PI/2, -Math.PI/2 + Math.PI*2*k);
-      ctx.closePath();
-      ctx.save();
-      roundRect(x, y, S, S, 8); ctx.clip();
-      ctx.fill();
-      ctx.restore();
+      ctx.fillStyle = "rgba(6,8,16,.68)";
+      ctx.beginPath(); ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, S*0.72, -Math.PI/2, -Math.PI/2 + Math.PI*2*k); ctx.closePath();
+      ctx.save(); roundRect(x, y, S, S, 9); ctx.clip(); ctx.fill(); ctx.restore();
     }
   }
-  ctx.textAlign = "center";
-  ctx.font = "bold 11px sans-serif"; ctx.fillStyle = locked ? "#64748b" : "#fbbf24";
-  ctx.fillText(key, x + S/2, y + 13);
-  ctx.font = "10px sans-serif"; ctx.fillStyle = locked ? "#64748b" : "#cbd5e1";
-  ctx.fillText(name, x + S/2, y + S - 6);
+  // 키캡
+  ctx.fillStyle = "rgba(0,0,0,.5)"; roundRect(x+3, y+2, key.length>2?30:16, 14, 4); ctx.fill();
+  ctx.textAlign = "center"; ctx.font = "bold 10px 'Trebuchet MS',sans-serif";
+  ctx.fillStyle = locked ? "#5f6a86" : "#ffd98a";
+  ctx.fillText(key, x + 3 + (key.length>2?15:8), y + 12);
+  // 이름
+  ctx.font = "9px sans-serif"; ctx.fillStyle = locked ? "#5f6a86" : "#c8d0e0";
+  ctx.fillText(name, cx, y + S - 5);
   ctx.restore();
 }
 
@@ -5614,6 +5820,110 @@ function roundRect(x, y, w, h, r){
   ctx.arcTo(x, y, x + w, y, r);
   ctx.closePath();
 }
+
+// ============================== UI 키트 (통일 룩) ==============================
+const UI = { ink:"#e8ecf6", dim:"#9aa4bd", faint:"#5f6a86", gold:"#f2c46b", line:"#3a4256" };
+// 색 밝기 조절 (amt: -1~1)
+function shade(hex, amt){
+  const n = parseInt(hex.slice(1), 16);
+  let r = (n>>16)&255, g = (n>>8)&255, b = n&255;
+  if(amt >= 0){ r += (255-r)*amt; g += (255-g)*amt; b += (255-b)*amt; }
+  else { r *= (1+amt); g *= (1+amt); b *= (1+amt); }
+  return `rgb(${r|0},${g|0},${b|0})`;
+}
+// 헤더용 자간 텍스트
+function headerText(txt, x, y, size, col, spacing, align){
+  ctx.save();
+  ctx.textAlign = align || "left";
+  ctx.font = `600 ${size}px "Trebuchet MS","Segoe UI",sans-serif`;
+  if("letterSpacing" in ctx) ctx.letterSpacing = (spacing ?? 1) + "px";
+  ctx.fillStyle = col || UI.ink;
+  ctx.fillText(txt, x, y);
+  if("letterSpacing" in ctx) ctx.letterSpacing = "0px";
+  ctx.restore();
+}
+// 공통 패널: 유리질 배경 + 이중 테두리 + 상단 하이라이트 + 코너 장식
+function uiPanel(x, y, w, h, opts){
+  opts = opts || {};
+  const accent = opts.accent || "#7c6cc0";
+  const r = opts.r ?? 14;
+  ctx.save();
+  // 그림자
+  ctx.fillStyle = "rgba(0,0,0,.35)";
+  roundRect(x+3, y+5, w, h, r); ctx.fill();
+  // 본체 그라데이션
+  const g = ctx.createLinearGradient(0, y, 0, y+h);
+  g.addColorStop(0, "rgba(24,27,44,.97)");
+  g.addColorStop(1, "rgba(14,16,28,.98)");
+  ctx.fillStyle = g; roundRect(x, y, w, h, r); ctx.fill();
+  // 상단 광택
+  const gl = ctx.createLinearGradient(0, y, 0, y+h*0.4);
+  gl.addColorStop(0, "rgba(255,255,255,.06)"); gl.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = gl; roundRect(x, y, w, h*0.5, r); ctx.fill();
+  // 외곽 테두리(악센트)
+  ctx.strokeStyle = accent; ctx.lineWidth = 1.5; ctx.globalAlpha = 0.85;
+  roundRect(x+1, y+1, w-2, h-2, r-1); ctx.stroke();
+  ctx.globalAlpha = 1;
+  // 내곽 얇은 선
+  ctx.strokeStyle = "rgba(255,255,255,.05)"; ctx.lineWidth = 1;
+  roundRect(x+4, y+4, w-8, h-8, r-3); ctx.stroke();
+  // 코너 장식(작은 마름모)
+  if(opts.corners !== false){
+    ctx.fillStyle = accent;
+    for(const [cx,cy] of [[x+10,y+10],[x+w-10,y+10],[x+10,y+h-10],[x+w-10,y+h-10]]){
+      ctx.save(); ctx.translate(cx,cy); ctx.rotate(Math.PI/4); ctx.globalAlpha=0.7;
+      ctx.fillRect(-2.5,-2.5,5,5); ctx.restore();
+    }
+  }
+  ctx.restore();
+}
+// 광택 게이지 바
+function uiBar(x, y, w, h, ratio, c1, c2, opts){
+  opts = opts || {};
+  ctx.save();
+  // 트랙
+  ctx.fillStyle = "rgba(0,0,0,.55)";
+  roundRect(x-1, y-1, w+2, h+2, h/2+1); ctx.fill();
+  // 채움
+  const rr = clamp(ratio, 0, 1);
+  if(rr > 0.001){
+    roundRect(x, y, Math.max(h, w*rr), h, h/2); ctx.save(); ctx.clip();
+    const g = ctx.createLinearGradient(0, y, 0, y+h);
+    g.addColorStop(0, c1); g.addColorStop(1, c2 || c1);
+    ctx.fillStyle = g; ctx.fillRect(x, y, w, h);
+    // 상단 하이라이트
+    ctx.fillStyle = "rgba(255,255,255,.28)"; ctx.fillRect(x, y+1, w, h*0.34);
+    ctx.restore();
+  }
+  // 세그먼트 눈금
+  if(opts.seg){ ctx.strokeStyle = "rgba(0,0,0,.35)"; ctx.lineWidth = 1;
+    for(let i=1;i<opts.seg;i++){ const sx=x+w*i/opts.seg; ctx.beginPath(); ctx.moveTo(sx,y); ctx.lineTo(sx,y+h); ctx.stroke(); }
+  }
+  // 테두리
+  ctx.strokeStyle = "rgba(255,255,255,.12)"; ctx.lineWidth = 1;
+  roundRect(x, y, w, h, h/2); ctx.stroke();
+  ctx.restore();
+}
+// 테마별 아트 메타 (컬러그레이드·안개·앰비언트·원경 광원)
+const THEME_ART = {
+  campus:  { grade:"rgba(60,40,110,.14)", haze:"#3a2b58", amb:["#6b5cff","#c4b5fd"], ambN:0.30, light:"rgba(150,130,255,.05)", warm:false },
+  school:  { grade:"rgba(40,28,14,.16)", haze:"#241a10", amb:["#ffcf8a","#ffe0a0"], ambN:0.12, light:"rgba(255,200,120,.05)", warm:true },
+  basement:{ grade:"rgba(0,0,0,.2)", haze:"#0c0e0c", amb:["#3a4a3a","#2f3b30"], ambN:0.0, light:"rgba(0,0,0,0)", warm:false },
+  forest:  { grade:"rgba(30,60,40,.16)", haze:"#1a2a20", amb:["#8fd6a0","#d9f7c0"], ambN:0.28, light:"rgba(160,220,150,.06)", warm:false },
+  town:    { grade:"rgba(70,40,60,.14)", haze:"#3e2c45", amb:["#ffd0a0","#ffe0b0"], ambN:0.18, light:"rgba(255,190,140,.05)", warm:true },
+  harbor:  { grade:"rgba(30,50,80,.14)", haze:"#2b3f63", amb:["#bfe3ff","#e0f0ff"], ambN:0.14, light:"rgba(180,210,255,.05)", warm:false },
+  coast:   { grade:"rgba(80,50,60,.15)", haze:"#5a3a3d", amb:["#ffd0a0","#ffb787"], ambN:0.16, light:"rgba(255,190,150,.06)", warm:true },
+  volcano: { grade:"rgba(90,20,10,.18)", haze:"#5a1f14", amb:["#ff7b3a","#ffb35c"], ambN:0.4, light:"rgba(255,120,60,.08)", warm:true },
+  snow:    { grade:"rgba(120,140,170,.12)", haze:"#8a97a8", amb:["#ffffff","#dbeafe"], ambN:0.5, light:"rgba(220,235,255,.06)", warm:false },
+  ice:     { grade:"rgba(40,80,130,.14)", haze:"#3a5578", amb:["#dbeafe","#ffffff"], ambN:0.4, light:"rgba(190,220,255,.07)", warm:false },
+  mine:    { grade:"rgba(30,20,60,.18)", haze:"#1c1840", amb:["#c4b5fd","#a5f3fc"], ambN:0.34, light:"rgba(0,0,0,0)", warm:false },
+  forge:   { grade:"rgba(80,30,10,.16)", haze:"#3a1f10", amb:["#ff8040","#ffb060"], ambN:0.3, light:"rgba(255,130,60,.07)", warm:true },
+  garden:  { grade:"rgba(120,180,200,.1)", haze:"#bcd8ea", amb:["#ffffff","#d9f7e0"], ambN:0.3, light:"rgba(255,255,240,.1)", warm:false, rays:true },
+  ash:     { grade:"rgba(30,30,36,.2)", haze:"#3a3a42", amb:["#b4b4b9","#8a8a90"], ambN:0.5, light:"rgba(120,120,130,.04)", warm:false },
+  temple:  { grade:"rgba(90,70,20,.14)", haze:"#5a4a24", amb:["#ffe08a","#fff0c0"], ambN:0.24, light:"rgba(255,220,140,.09)", warm:true, rays:true },
+};
+function themeArt(){ return THEME_ART[mapTheme] || THEME_ART.forest; }
+function clipText(t, n){ return t.length > n ? t.slice(0, n-1) + "…" : t; }
 
 // ============================== BOOT & MAIN LOOP ==============================
 loadMap("campus", 200);   // 신규 시작: 아르카나 언덕 서쪽 기슭 (튜토리얼)
