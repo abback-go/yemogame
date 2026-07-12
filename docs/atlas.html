@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>아르카나 아카데미 — 월드 아틀라스 & 대확장 기획서 v2.0</title>
+<style>
+  :root{
+    --bg:#0e1220; --panel:#151a2e; --text:#d6dcec; --dim:#8a93ad;
+    --accent:#8be9fd; --gold:#fbbf24; --line:#2a3352; --code:#1b2138;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font:16px/1.75 "Pretendard","Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",sans-serif;}
+  .wrap{display:flex;max-width:1280px;margin:0 auto;}
+  nav{width:290px;flex:none;position:sticky;top:0;height:100vh;overflow-y:auto;
+    padding:28px 18px;border-right:1px solid var(--line);background:var(--panel);}
+  nav .brand{font-weight:800;color:var(--accent);font-size:15px;margin-bottom:4px}
+  nav .sub{font-size:11px;color:var(--dim);margin-bottom:14px}
+  nav a{display:block;color:var(--dim);text-decoration:none;font-size:12.5px;
+    padding:3px 8px;border-radius:6px;line-height:1.45;}
+  nav a:hover{color:var(--accent);background:rgba(139,233,253,.07)}
+  nav a.toc-2{color:var(--text);font-weight:700;margin-top:10px;font-size:13px}
+  nav a.play{margin:0 0 6px;padding:8px;text-align:center;background:#7c3aed;
+    color:#fff;font-weight:700;border-radius:8px;font-size:13px}
+  main{flex:1;min-width:0;padding:40px 48px 120px;}
+  h1{font-size:30px;line-height:1.3;color:#fff;border-bottom:2px solid var(--accent);padding-bottom:14px}
+  h2{font-size:23px;color:var(--accent);margin-top:56px;border-bottom:1px solid var(--line);padding-bottom:8px}
+  h3{font-size:18px;color:var(--gold);margin-top:36px}
+  h4{font-size:15.5px;color:#e8ecf8;margin-top:28px}
+  a{color:var(--accent)}
+  strong{color:#fff}
+  blockquote{margin:16px 0;padding:10px 18px;border-left:4px solid var(--gold);
+    background:rgba(251,191,36,.06);border-radius:0 8px 8px 0;color:#e4d9b8}
+  blockquote p{margin:6px 0}
+  code{background:var(--code);padding:2px 7px;border-radius:5px;font-size:.88em;color:#a5d6ff}
+  pre{background:var(--code);border:1px solid var(--line);border-radius:10px;
+    padding:16px 18px;overflow-x:auto;line-height:1.5}
+  pre code{background:none;padding:0;color:#c9d6f0;font-size:13px}
+  table{border-collapse:collapse;width:100%;margin:18px 0;font-size:14px;display:block;overflow-x:auto}
+  th,td{border:1px solid var(--line);padding:8px 12px;text-align:left;vertical-align:top}
+  th{background:#1c2340;color:#fff;white-space:nowrap}
+  tr:nth-child(even) td{background:rgba(255,255,255,.02)}
+  hr{border:none;border-top:1px dashed var(--line);margin:44px 0}
+  li{margin:4px 0}
+  @media(max-width:900px){
+    .wrap{flex-direction:column}
+    nav{position:static;width:100%;height:auto;max-height:280px;border-right:none;border-bottom:1px solid var(--line)}
+    main{padding:24px 20px 80px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav>
+  <div class="brand">아르카나 아카데미</div>
+  <div class="sub">월드 아틀라스 & 대확장 기획서 v2.0</div>
+  <a class="play" href="../">🎮 게임 플레이</a>
+  <a class="play" style="background:#334155" href="./">📖 메인 기획서</a>
+  <a class="play" style="background:#334155" href="./world.html">🗺️ 월드 개편 v1.0</a>
+  <a class="toc-3" href="#h1">할로우 나이트급 세계 — &quot;마법학교를 심장으로 둔 하나의 대륙&quot;</a>
+<a class="toc-2" href="#h2">0. 목표 선언</a>
+<a class="toc-3" href="#h3">0.1 지루하지 않은 탐험의 5원칙 (할로우 나이트 분석)</a>
+<a class="toc-2" href="#h4">1. 월드 아틀라스 — 대륙 전도</a>
+<a class="toc-3" href="#h5">1.1 전도 (할로우네스트식 단면도)</a>
+<a class="toc-3" href="#h6">1.2 존 목록 (12 + 실내)</a>
+<a class="toc-2" href="#h7">2. 무브먼트 오버홀 — &quot;이동이 곧 재미&quot; ★최우선★</a>
+<a class="toc-3" href="#h8">2.1 기본 조작감 (전면 리튠)</a>
+<a class="toc-3" href="#h9">2.2 이동 술식 6종 — 탐험이 주는 힘 (습득 순서 자유)</a>
+<a class="toc-3" href="#h10">2.3 학교와의 연결</a>
+<a class="toc-2" href="#h11">3. 존 상세 설계 — 신규 6존 (아주 자세히)</a>
+<a class="toc-3" href="#h12">Z6. ❄ 서리고개 — &quot;화염술사의 첫 시험, 추위&quot;</a>
+<a class="toc-3" href="#h13">Z7. ❄ 얼음 마을 &#39;겨울바람&#39; — &quot;얼어붙은 호수 위의 등불&quot;</a>
+<a class="toc-3" href="#h14">Z8. 💎 별빛 광산 — &quot;지하에 뜬 은하수&quot;</a>
+<a class="toc-3" href="#h15">Z9. ⚒ 모루골 — &quot;용암이 두드리는 대장간 마을&quot;</a>
+<a class="toc-3" href="#h16">Z10. ⛅ 부유 정원 — &quot;하늘에 뜬 옛 정원&quot;</a>
+<a class="toc-3" href="#h17">Z11. 🏚 재의 거리 — &quot;재의 눈이 내리는 옛 도시&quot;</a>
+<a class="toc-3" href="#h18">Z12. 🛕 첫 불꽃의 신전 — &quot;모든 길이 끝나는 곳&quot;</a>
+<a class="toc-3" href="#h19">기존 존 확장 (Z1~Z5)</a>
+<a class="toc-2" href="#h20">4. 학교가 심장인 이유 — 배움과 탐험의 이중 나선</a>
+<a class="toc-2" href="#h21">5. 게이트 매트릭스 — 성장이 지도를 다시 그린다</a>
+<a class="toc-2" href="#h22">6. 액트 흐름 (강제가 아닌 물길)</a>
+<a class="toc-2" href="#h23">7. 구현 로드맵</a>
+<a class="toc-2" href="#h24">8. 승인 요청</a>
+</nav>
+<main>
+<h1 id="h0">아르카나 아카데미 — 월드 아틀라스 &amp; 대확장 기획서 v2.0</h1>
+<h3 id="h1">할로우 나이트급 세계 — &quot;마법학교를 심장으로 둔 하나의 대륙&quot;</h3>
+<blockquote>
+<p><strong>v2.0 (2026-07-12) · 제안 단계 — 승인 후 단계별 구현</strong>
+<a href="world.html">월드 &amp; 모험 개편 기획서 v1.0</a>(Phase 1 구현 완료, v0.15)의 후속.
+본 문서는 <strong>세계 전체의 최종 청사진</strong>이다 — 신규 존 6개, 이동 오버홀, 게이트 매트릭스, 구현 로드맵.</p>
+</blockquote>
+<hr>
+<h2 id="h2">0. 목표 선언</h2>
+<blockquote>
+<p><strong>&quot;지도를 펼쳤을 때 심장이 뛰는 게임.&quot;</strong>
+할로우 나이트의 할로우네스트처럼 — 위로는 하늘, 아래로는 심층까지 겹겹이 쌓인 대륙.
+단, 이 세계의 심장은 왕국이 아니라 <strong>마법학교</strong>다. 배움이 모험이 되고, 모험이 배움이 되는 구조.</p>
+</blockquote>
+<h3 id="h3">0.1 지루하지 않은 탐험의 5원칙 (할로우 나이트 분석)</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>원칙</th>
+<th>구현 방침</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td><strong>존마다 다른 &#39;놀이&#39;</strong></td>
+<td>존 = 팔레트+음악이 아니라 <strong>고유 기믹</strong> 하나씩: 숲=수직 낙하, 설산=온기 관리, 광산=고속 질주 레일, 부유 정원=상승 기류, 재의 거리=유령 서사, 신전=봉인 퍼즐</td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>3화면 1볼거리</strong></td>
+<td>어느 방향으로 3화면 이동하면 반드시 하나 — 비밀·NPC·기록판·전투 이벤트·풍경</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>성장이 지도를 다시 그린다</strong></td>
+<td>이동 술식 하나를 얻을 때마다 기존 존의 20~30%가 새로 열림 (게이트 매트릭스 §5)</td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>돌아오는 길은 항상 짧다</strong></td>
+<td>존마다 지름길 2개+ / 후반 아르카 마법진(빠른 이동)</td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>이동 자체가 재미</strong></td>
+<td>§2 무브먼트 오버홀 — 조작감이 곧 콘텐츠</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="h4">1. 월드 아틀라스 — 대륙 전도</h2>
+<h3 id="h5">1.1 전도 (할로우네스트식 단면도)</h3>
+<pre><code>═══════════════════════════ 하 늘 ═══════════════════════════════════════
+
+                       ⛅ 부유 정원
+                  떠 있는 섬들 · 상승 기류 · 바람의 성소
+                  ▲기류(시계탑 천문대)        ↓낙하 샛길(설산 정상)
+                       │                        │
+═══════════════════ 고 지 ═══════════════════════════════════════════════
+
+  ❄ 서리고개 ════ ❄ 얼음 마을 &#39;겨울바람&#39;
+  눈보라 고갯길      얼어붙은 호수 위 마을 · 은둔 빙설술사
+      ║(온기 게이지)        ║(빙벽 — 벽 점프)
+      ║                    ║
+═══════════════════ 지 상 ═══════════════════════════════════════════════
+      ║                    ║
+ 🌊 노을 해안 ═════════ 🏰 아르카나 언덕 ═════════ 🌲 깊은 숲 ═ 시험장
+ 등대·절벽길·마을·항구      ★ 마법학교 (세계의 심장)      캐노피/숲 바닥/심연
+   │서리 산길(등대 뒤)      시계탑·천문대·우물            │
+   ║우물      ║배편        ║본관 지하   ║낡은 우물        ║뿌리 동굴
+      ║                    ║                    ║
+═══════════════════ 지 하 ═══════════════════════════════════════════════
+      ║                    ║                    ║
+ (해식 동굴·썰물) ═════ 🕯 지하 미궁 — 카타콤 ═════════ 💎 별빛 광산
+                       세계의 교차로 · 의문의 문          수정 동굴 · 유성 질주 레일
+ 🌋 화산 섬 · 불의 마을    ║서쪽 용암 지맥      ║의문의 문(봉인)     ║수직 갱도
+ 화구 등반 · 불꽃 투기장 ═ ⚒ 모루골 — 대장장이 마을        ║
+   (용암 동굴 지름길)      용암 단조장 · 마도각인 공방      ║
+                            ║재의 수로              ║
+═══════════════════ 심 층 ═══════════════════════════════════════════════
+                            ║                    ║
+                       🏚 재의 거리 ═════════════════╝
+                       황폐한 옛 마법도시 · 제1 아카데미 폐허 · 재의 눈
+                            ║(세 인장의 문)
+                       🛕 첫 불꽃의 신전
+                       최종 지역 · 모든 떡밥의 회수처
+═══════════════════════════════════════════════════════════════════════
+</code></pre>
+<h3 id="h6">1.2 존 목록 (12 + 실내)</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>존</th>
+<th>위치</th>
+<th>상태</th>
+<th>고유 기믹</th>
+<th>핵심 보상</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Z1</td>
+<td>🏰 아르카나 언덕</td>
+<td>지상 중앙</td>
+<td><strong>구현됨</strong> (확장 예정)</td>
+<td>허브·수직 시계탑</td>
+<td>천문대(부유 정원行)</td>
+</tr>
+<tr>
+<td>Z2</td>
+<td>🌲 깊은 숲</td>
+<td>지상 동</td>
+<td><strong>구현됨</strong></td>
+<td>3층 수직 낙하</td>
+<td>바람 걸음(이중 점프)</td>
+</tr>
+<tr>
+<td>Z3</td>
+<td>🕯 지하 미궁</td>
+<td>지하 중앙</td>
+<td><strong>구현됨</strong> (확장 예정)</td>
+<td>세계의 교차로</td>
+<td>도마뱀 발(벽 점프)</td>
+</tr>
+<tr>
+<td>Z4</td>
+<td>🌊 노을 해안</td>
+<td>지상 서</td>
+<td><strong>구현됨</strong> (확장 예정)</td>
+<td>썰물/밀물 해식 동굴</td>
+<td>서리 산길 개방</td>
+</tr>
+<tr>
+<td>Z5</td>
+<td>🌋 화산 섬 · 불의 마을</td>
+<td>남서 (배)</td>
+<td><strong>구현됨</strong> (확장 예정)</td>
+<td>화구 등반·투기장</td>
+<td>내열 각인·투기장</td>
+</tr>
+<tr>
+<td>Z6</td>
+<td>❄ 서리고개</td>
+<td>고지 북서</td>
+<td>신규</td>
+<td><strong>온기 게이지</strong></td>
+<td>얼음 마을 진입</td>
+</tr>
+<tr>
+<td>Z7</td>
+<td>❄ 얼음 마을 &#39;겨울바람&#39;</td>
+<td>고지 북</td>
+<td>신규</td>
+<td>미끄러운 빙판·빙벽</td>
+<td>은둔 빙설술사(비전)</td>
+</tr>
+<tr>
+<td>Z8</td>
+<td>💎 별빛 광산</td>
+<td>지하 동</td>
+<td>신규</td>
+<td><strong>유성 질주 레일</strong></td>
+<td>유성 질주(고속 돌진)</td>
+</tr>
+<tr>
+<td>Z9</td>
+<td>⚒ 모루골</td>
+<td>지하 남서</td>
+<td>신규</td>
+<td>단조·용암 리프트</td>
+<td>마도각인(부적) 제작</td>
+</tr>
+<tr>
+<td>Z10</td>
+<td>⛅ 부유 정원</td>
+<td>최상층</td>
+<td>신규</td>
+<td><strong>상승 기류 활공</strong></td>
+<td>재의 망토(활공)</td>
+</tr>
+<tr>
+<td>Z11</td>
+<td>🏚 재의 거리</td>
+<td>심층</td>
+<td>신규</td>
+<td>재의 눈·유령 서사</td>
+<td>섬화(점멸)·세 인장</td>
+</tr>
+<tr>
+<td>Z12</td>
+<td>🛕 첫 불꽃의 신전</td>
+<td>최심층</td>
+<td>신규 (최종)</td>
+<td>봉인 퍼즐·성역</td>
+<td>최종장 (빌런 서사는 추후)</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="h7">2. 무브먼트 오버홀 — &quot;이동이 곧 재미&quot; ★최우선★</h2>
+<p>할로우 나이트의 손맛은 수치의 문제다. <strong>v0.16에서 최우선 적용.</strong></p>
+<h3 id="h8">2.1 기본 조작감 (전면 리튠)</h3>
+<table>
+<thead>
+<tr>
+<th>항목</th>
+<th>현재</th>
+<th>개편</th>
+<th>효과</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>이동 속도</td>
+<td>340</td>
+<td><strong>390</strong> (+15%)</td>
+<td>존이 커진 만큼 발도 빨라야</td>
+</tr>
+<tr>
+<td>가속/감속</td>
+<td>보통</td>
+<td><strong>+25% / 즉각 반전</strong></td>
+<td>반응이 손에 붙는 느낌</td>
+</tr>
+<tr>
+<td>공중 제어</td>
+<td>0.65</td>
+<td><strong>0.85</strong></td>
+<td>점프 궤도를 공중에서 그리는 맛</td>
+</tr>
+<tr>
+<td><strong>코요테 타임</strong></td>
+<td>없음</td>
+<td><strong>0.10s</strong></td>
+<td>발판 끝에서 늦은 점프 허용 — 억울한 낙사 제거</td>
+</tr>
+<tr>
+<td><strong>점프 버퍼</strong></td>
+<td>없음</td>
+<td><strong>0.12s</strong></td>
+<td>착지 직전 입력 선입력</td>
+</tr>
+<tr>
+<td><strong>가변 점프</strong></td>
+<td>없음</td>
+<td>키를 떼면 상승 45% 컷</td>
+<td>낮게/높게 자유자재</td>
+</tr>
+<tr>
+<td>낙하 최고속</td>
+<td>낮음</td>
+<td><strong>+25%</strong> + 착지 먼지 연출</td>
+<td>낙하가 시원하게</td>
+</tr>
+<tr>
+<td>대시</td>
+<td>쿨 0.45s</td>
+<td><strong>0.35s</strong> + 대시 후 0.15s 모멘텀 보존</td>
+<td>대시→점프 연계(대시점프)가 이동의 기본기로</td>
+</tr>
+<tr>
+<td>계단/턱</td>
+<td>걸림</td>
+<td>6px 이하 턱 자동 승월</td>
+<td>걸리적거림 제거</td>
+</tr>
+</tbody></table>
+<h3 id="h9">2.2 이동 술식 6종 — 탐험이 주는 힘 (습득 순서 자유)</h3>
+<table>
+<thead>
+<tr>
+<th>순</th>
+<th>술식</th>
+<th>효과</th>
+<th>습득처 (사당/스승)</th>
+<th>대표 개방</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td><strong>바람 걸음</strong></td>
+<td>이중 점프</td>
+<td>Z2 캐노피 동쪽 끝 · 바람 사당</td>
+<td>설산 진입로, 높은 절벽 전반</td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>도마뱀 발</strong></td>
+<td>벽 점프</td>
+<td>Z3 카타콤 · 벽 사당</td>
+<td>수직 갱도, 얼음 마을 빙벽, 화구</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>도깨비불</strong></td>
+<td>부유 광원 토글</td>
+<td>사서 서브퀘(책 정령 6)</td>
+<td>Z3 하층 암흑, 광산 심부</td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>유성 질주</strong></td>
+<td>충전 후 수평 고속 돌진 — <strong>균열 암벽 파괴·질주 레일</strong></td>
+<td>Z8 별빛 광산 · 유성 사당</td>
+<td>광산 레일망, 장거리 이동 혁명</td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>재의 망토</strong></td>
+<td>활공(점프 유지 시 완강하) + <strong>상승 기류 탑승</strong></td>
+<td>Z10 부유 정원 · 바람의 성소</td>
+<td>부유 정원 완주, 낙하 구간 역주행</td>
+</tr>
+<tr>
+<td>6</td>
+<td><strong>섬화(閃火)</strong></td>
+<td>단거리 점멸 — <strong>가시덤불·재의 장막 통과</strong></td>
+<td>Z11 재의 거리 · 그을린 사당</td>
+<td>신전 봉인 구간, 최종 지역</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p><strong>설계 의도</strong>: 4번(유성 질주)부터는 &quot;이동 자체가 액션&quot;. 할로우 나이트에서 크리스탈 대시를 얻는 순간 세계가 좁아지며 쾌감이 오는 것처럼, 후반 이동술은 <strong>세계를 정복하는 감각</strong>을 준다.</p>
+</blockquote>
+<h3 id="h10">2.3 학교와의 연결</h3>
+<ul>
+<li>이동 술식도 <strong>학생 수첩 &#39;술식&#39; 탭</strong>에 기록되고, 습득 시 담임 아그니스의 코멘트 이벤트(&quot;…그건 정규 과정에 없는 술식인데. 어디서 배웠지?&quot;) — 세계의 비전(秘傳)과 학교의 정규 과정이 서로를 인식한다.</li>
+<li>각 술식 습득 직후 3초 안에 &quot;이제 갈 수 있는 곳&quot;을 화면 안에 하나 배치 (즉시 써먹기 원칙).</li>
+</ul>
+<hr>
+<h2 id="h11">3. 존 상세 설계 — 신규 6존 (아주 자세히)</h2>
+<blockquote>
+<p>표기: <strong>크기</strong>(px) / <strong>층 구조</strong> / <strong>진입로</strong>(→요구 능력) / <strong>기믹</strong> / <strong>주민·몬스터</strong> / <strong>콘텐츠</strong> / <strong>지름길·비밀</strong></p>
+</blockquote>
+<h3 id="h12">Z6. ❄ 서리고개 — &quot;화염술사의 첫 시험, 추위&quot;</h3>
+<ul>
+<li><strong>정체성</strong>: 잿빛 하늘, 몰아치는 눈보라의 고갯길. 얼음 마을로 가는 관문이자 <strong>온기 관리 튜토리얼 존</strong>. 화염학교 학생에게 추위는 최고의 스승이다.</li>
+<li><strong>크기/층</strong>: 5,200 × 2,000. 2층 — 산길(주 지면) + 바람굴(하부 동굴).</li>
+<li><strong>진입로 (2)</strong>:<ul>
+<li>Z4 노을 해안 · 등대 뒤 &#39;서리 산길&#39; → <strong>바람 걸음(이중 점프)</strong> 필요 (절벽 오르기)</li>
+<li>Z10 부유 정원에서 낙하 샛길 (일방 — 후반의 &quot;아하!&quot;)</li>
+</ul>
+</li>
+<li><strong>고유 기믹 — 온기 게이지 ★</strong>:<ul>
+<li>존 체류 중 온기가 서서히 감소, 0이 되면 초당 HP 잠식. 길가의 <strong>꺼진 화로에 불티(Z)를 붙이면</strong> 화로가 점화되고 온기 완충 + 체크포인트 역할.</li>
+<li>화로 간격이 곧 난이도 리듬 — 초반 3화면당 1개, 심부는 5화면당 1개.</li>
+<li><strong>화염 장판(C) 위에 서 있으면 온기 회복</strong> — 배운 마법이 생존 기술이 되는 순간.</li>
+</ul>
+</li>
+<li><strong>몬스터</strong>: 서리 늑대(돌진), 눈보라 정령(부유·감속 오라), 고드름 게(천장 낙하).</li>
+<li><strong>콘텐츠</strong>: 화로 점화 퍼즐(제한시간 내 3개 연쇄 점화 → 비밀 창고), 조난당한 상인 구출(서브퀘 — 구하면 모루골에서 재회·할인), 기록판 2(&quot;첫 불꽃은 추위에서 태어났다&quot;), 책 정령 2.</li>
+<li><strong>지름길</strong>: 고개 정상에서 등대 뒤로 내려가는 밧줄 (레버 개방).</li>
+</ul>
+<h3 id="h13">Z7. ❄ 얼음 마을 &#39;겨울바람&#39; — &quot;얼어붙은 호수 위의 등불&quot;</h3>
+<ul>
+<li><strong>정체성</strong>: 얼어붙은 호수 위에 지어진 목조 마을. 처마마다 등불, 호수 아래에 잠긴 옛 건물들이 비쳐 보인다. 서정적·고요. <strong>북부의 안전 마을</strong> (여명 마을의 북부 대응).</li>
+<li><strong>크기/층</strong>: 6,000 × 2,400. 3층 — 마을(주 지면) / 빙벽 상부(신사) / <strong>호수 밑</strong>(얼음 아래 잠수 구역 — 시간제한 잠수, 후반).</li>
+<li><strong>진입로 (3)</strong>: 서리고개 동쪽 끝 / 빙벽 위 신사 → 부유 정원(활공) / 호수 밑 균열 → 별빛 광산 상부 갱도 (<strong>유성 질주</strong>로 얼음벽 파괴 — 북부↔동부 대순환로 완성).</li>
+<li><strong>고유 기믹</strong>: 빙판 관성(미끄러짐 — 대시로 상쇄 가능), 빙벽(벽 점프 전용 수직 구간).</li>
+<li><strong>주민</strong>: 촌장(현장 학습 승인 도장 — 학교 퀘스트 연동), 온천 여관(회복+세이브 스팟), 낚시꾼(호수 밑 떡밥), <strong>은둔 빙설술사 &#39;유키네&#39;</strong> ★.</li>
+<li><strong>은둔 스승 — 유키네</strong>: 전직 아카데미 교수(빙설학 폐과와 함께 떠남). <strong>비전 수업 3식</strong>: ①서리 갑옷(피격 시 냉기 반격 버프) ②빙결탄(적 둔화 투사체) ③얼음 다리(허공에 1.5초 발판 생성 — <strong>이동+전투 하이브리드</strong>). 습득 조건: 현장 학습 퀘스트 체인(마을 부탁 3개) + 화염술 Lv 조건 — &quot;불을 아는 자만이 얼음을 이해한다&quot;.</li>
+<li><strong>몬스터</strong>: 마을 안은 평화 / 외곽 — 얼음 조각상(위장 매복), 눈올빼미(급강하).</li>
+<li><strong>미니보스</strong>: <strong>호수 밑 — 서리 고래 &#39;브루멘&#39;</strong> (얼음 아래에서 유영하며 바닥을 깨뜨림, 옵션).</li>
+<li><strong>콘텐츠</strong>: 온천(정서적 쉼터 — HK Hot Spring 오마주), 기록판 3(빙설학 폐과의 진실 = 제1 아카데미 떡밥과 연결), 책 정령 2, 겨울 축제 이벤트 훅(추후).</li>
+</ul>
+<h3 id="h14">Z8. 💎 별빛 광산 — &quot;지하에 뜬 은하수&quot;</h3>
+<ul>
+<li><strong>정체성</strong>: 수정이 별처럼 빛나는 대동굴. 어둡지만 아름답다 — 공포가 아니라 <strong>경이</strong>의 지하. 버려진 광산 레일이 종횡으로 얽혀 있다.</li>
+<li><strong>크기/층</strong>: 7,000 × 3,000. 3층 — 상부 갱도 / 대공동(수정 은하) / 심부 막장.</li>
+<li><strong>진입로 (3)</strong>: Z2 숲 심연 동쪽 균열(→벽 점프) / Z3 미궁 동쪽 끝 갱도 입구 / Z7 호수 밑 균열(후반).</li>
+<li><strong>고유 기믹 — 유성 질주 레일 ★</strong>: 광산 레일 위에서 유성 질주를 쓰면 <strong>레일을 따라 자동 활강</strong>(곡선·수직 루프 포함). 레일망이 존의 고속도로 — 처음엔 걸어서 탐험한 길을, 술식 습득 후 질주로 가로지르는 쾌감. 레일 분기 레버로 경로 퍼즐.</li>
+<li><strong>몬스터</strong>: 수정 굼벵이(수정 갑각 — 차지 화염구로만 껍질 파괴), 갱도 유령(광부의 잔영 — 도깨비불 근처에서만 실체화), 굴착 딱정벌레.</li>
+<li><strong>미니보스</strong>: <strong>수정 거인 &#39;카브&#39;</strong> — 파괴한 수정이 재생되는 아레나, 유성 질주로 몸통 관통이 유일한 약점 타격 (술식 활용 강제 보스).</li>
+<li><strong>콘텐츠</strong>: <strong>유성 사당</strong>(유성 질주 습득 — 대공동 최심부, 벽점프+이중점프 플랫포밍의 정점에 배치), 마력 결정 광맥 다수(재화 최다 산출지), 광부의 일지 기록판 4(제1 아카데미가 &quot;무언가를 캐려 했다&quot;는 떡밥), 책 정령 3, 숨은 온천.</li>
+<li><strong>지름길</strong>: 레일 개통 자체가 지름길 (레버 3개로 미궁↔광산↔얼음호수 레일 연결).</li>
+</ul>
+<h3 id="h15">Z9. ⚒ 모루골 — &quot;용암이 두드리는 대장간 마을&quot;</h3>
+<ul>
+<li><strong>정체성</strong>: 카타콤 서쪽, 용암 지맥 위에 지어진 반지하 대장간 마을. 망치 소리가 끊이지 않는다. 무뚝뚝하지만 정 많은 대장장이들. <strong>제작(크래프팅) 허브</strong>.</li>
+<li><strong>크기/층</strong>: 5,400 × 2,200. 2층 — 마을·공방 거리(주) / 용암 단조장(하부 — 용암 리프트로 왕복).</li>
+<li><strong>진입로 (3)</strong>: Z3 카타콤 서쪽 용암 지맥 통로 / Z5 화산 용암 동굴(배 없이 화산↔본토를 잇는 <strong>후반 지름길</strong> — &quot;화산이 사실 이어져 있었다!&quot;) / 재의 수로 → Z11 (하부).</li>
+<li><strong>고유 기믹</strong>: 용암 리프트(주기적으로 상승/하강하는 용암 기둥 발판), 열기 구역(내열 각인 필요 — 모루골에서 제작하는 첫 각인이 바로 이것: <strong>자급 루프</strong>).</li>
+<li><strong>주민</strong>: 촌장 대장장이 &#39;브란&#39; ★, 각인 세공사, 고철상(서리고개에서 구출한 상인 재등장), 견습 드워프.</li>
+<li><strong>★ 마도각인(부적) 시스템의 고향</strong>:<ul>
+<li><strong>각인 제작</strong>: 마력 결정 + 소재(몬스터 드랍·광맥)로 부적 제작. 장착 슬롯 3 (성장 시 4~5).</li>
+<li>각인 예시 10종: 내열(화산·단조장 필수) / 결정 자석 / 낙하 무시 / MP 재생↑ / 콤보 연장 / 온기 지속↑ / 대시 쿨↓ / 크리티컬↑ / 도깨비불 광량↑ / 유성 질주 충전↓.</li>
+<li><strong>지팡이 단조</strong>: 브란이 지팡이를 3단계 강화(외형도 변화) — 스킬 위력 전역 +8%/단계. 소재는 각 존 보스가 드랍 → <strong>탐험·전투·성장의 삼각 루프</strong>.</li>
+</ul>
+</li>
+<li><strong>몬스터</strong>: 마을 내 평화 / 단조장 하부 — 슬래그 골렘, 불꽃 박쥐.</li>
+<li><strong>콘텐츠</strong>: 현장 학습(아그니스: &quot;단조 견학문 써오기&quot;), 기록판 2(제1 아카데미의 무기를 만들었던 죄책감), 책 정령 2, 투기장 소문(화산 투기장 홍보 NPC).</li>
+</ul>
+<h3 id="h16">Z10. ⛅ 부유 정원 — &quot;하늘에 뜬 옛 정원&quot;</h3>
+<ul>
+<li><strong>정체성</strong>: 부유석 위의 무너진 공중 정원. 흰 꽃, 바람 소리, 아득한 아래로 대륙 전경이 내려다보인다. 세계에서 가장 <strong>밝고 고요한</strong> 존 — 심층부와 정서적 대비.</li>
+<li><strong>크기/층</strong>: 6,400 × 3,200 (수직 최대). 떠 있는 섬 20여 개 — &quot;바닥이 없는&quot; 존.</li>
+<li><strong>진입로 (2)</strong>: Z1 시계탑 정상 → <strong>천문대</strong>(신설 소구역)에서 상승 기류 탑승(첫 진입은 이중 점프+벽 점프로 험난하게) / Z7 빙벽 신사 위(활공 습득 후).</li>
+<li><strong>고유 기믹 — 상승 기류 ★</strong>: 기류 기둥에 들어가면 상승. <strong>재의 망토(활공)</strong> 습득 전엔 기류를 &quot;타고 오르내리는&quot; 정도만 가능(제한 구역), 습득 후 자유 활강 — 존의 후반부가 열린다. 낙하하면 사망이 아니라 <strong>언덕/숲 상공으로 떨어져 복귀</strong> (낙하가 페널티가 아니라 지리 학습).</li>
+<li><strong>몬스터</strong>: 바람 해파리(기류 위장), 정원사 골렘(잠든 채 — 공격하면 기동), 꽃가루 정령.</li>
+<li><strong>미니보스</strong>: <strong>정원의 관리자 &#39;베르단&#39;</strong> — 기류를 역전시키는 3페이즈 (활공 숙련 시험).</li>
+<li><strong>콘텐츠</strong>: <strong>바람의 성소</strong>(재의 망토 습득), 최고 전망대(대륙 전경 — 스크린샷 명소, 기록판 &quot;여기서 보면 세계는 하나의 학교다&quot;), 하늘 온실(희귀 소재), 책 정령 2, 설산 낙하 샛길 발견.</li>
+</ul>
+<h3 id="h17">Z11. 🏚 재의 거리 — &quot;재의 눈이 내리는 옛 도시&quot;</h3>
+<ul>
+<li><strong>정체성</strong>: 제1 아카데미와 함께 몰락한 옛 마법도시. <strong>재가 눈처럼 끝없이 내린다</strong>. 유령 주민들은 자신이 죽은 걸 모른 채 등교하고, 장을 보고, 수업 종을 기다린다. 세계관의 심장 — City of Tears의 정서적 대응.</li>
+<li><strong>크기/층</strong>: 7,200 × 2,600. 3층 — 대로(주) / 지붕과 첨탑 / 지하 수로(재의 수로 — 모루골 연결).</li>
+<li><strong>진입로 (2)</strong>: Z3 지하 미궁 · <strong>의문의 문</strong> (드디어 열린다 — 고급 1식 이수 + 스토리) / Z9 재의 수로.</li>
+<li><strong>고유 기믹</strong>: 재의 장막(시야를 가리는 재 커튼 — <strong>섬화</strong>로만 통과), 유령 조우(도깨비불을 켜면 유령들이 실체화되어 대화 가능 — <strong>탐험 도구가 서사 도구가 되는 순간</strong> ★).</li>
+<li><strong>주요 서사 — 제1 아카데미 폐허</strong>:<ul>
+<li>현 아카데미의 전신. &quot;첫 불꽃&quot;을 통제하려다 도시와 함께 몰락했다.</li>
+<li><strong>유령 교장</strong> — 현 교장의 스승. 옛 강의실에서 아직도 수업 중. 플레이어에게 마지막 수업(비전: <strong>섬화</strong>)을 전수하는 <strong>그을린 사당</strong>의 주인.</li>
+<li>지금까지 흩뿌린 모든 떡밥(금서, 의문의 문, 지하의 웃음소리, 빙설학 폐과, 광산의 발굴, 모루골의 죄책감)이 여기 기록판·유령 대사로 회수된다.</li>
+</ul>
+</li>
+<li><strong>몬스터</strong>: 재 망령(섬화 잔상에 반응), 그을린 갑주(옛 경비병), 재 까마귀 떼.</li>
+<li><strong>미니보스</strong>: <strong>수석 졸업생의 그림자</strong> — 옛 아카데미 최강 학생의 잔영. 플레이어와 같은 스킬셋(불티/화염구/랜스/노바)을 쓰는 <strong>거울 보스</strong> ★.</li>
+<li><strong>콘텐츠</strong>: 세 인장 수집(신전 개문 열쇠 — ①거리 첨탑 꼭대기 ②수로 최심부 ③거울 보스 격파), 기록판 5, 책 정령 3, 유령 상점(기묘한 각인 판매).</li>
+</ul>
+<h3 id="h18">Z12. 🛕 첫 불꽃의 신전 — &quot;모든 길이 끝나는 곳&quot;</h3>
+<ul>
+<li><strong>정체성</strong>: 재의 거리 지하, 세 인장의 문 너머. 몰락 이전에 봉인된 성역. 여기만 <strong>재가 내리지 않고, 촛불이 꺼지지 않는다</strong>. 장엄·정적.</li>
+<li><strong>크기/층</strong>: 4,800 × 2,400. 성역 3구획 — 참배로 / 봉인 회랑 / 첫 불꽃의 제단.</li>
+<li><strong>진입로 (1)</strong>: 세 인장의 문 (유일 — 최종 지역의 무게).</li>
+<li><strong>고유 기믹 — 봉인 퍼즐</strong>: 회랑의 고대 화로들을 <strong>모든 배운 술식으로</strong> 점화하는 종합 시험 — 불티(원거리 점화)·화염구(균열 파괴)·랜스(격자 관통)·장판(연쇄 점화)·인페르노(집중 가열)·멸화(전체 점화). <strong>게임 전체가 이 회랑의 열쇠</strong>.</li>
+<li><strong>콘텐츠</strong>: 신전 문지기 보스 &#39;첫 불꽃의 수호자&#39;(설계만 — <strong>최종 빌런 서사는 추후 별도 기획</strong>), 제단(다음 장 떡밥: 첫 불꽃의 정체), 최심부 기록판 &quot;불꽃은 소유하는 것이 아니라 배우는 것이다&quot; — 게임 주제 회수.</li>
+</ul>
+<h3 id="h19">기존 존 확장 (Z1~Z5)</h3>
+<table>
+<thead>
+<tr>
+<th>존</th>
+<th>확장 내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Z1 언덕</td>
+<td>시계탑 정상 위 <strong>천문대</strong> 소구역(부유 정원 기류 진입로), 지붕 정원 확장</td>
+</tr>
+<tr>
+<td>Z2 숲</td>
+<td>심연 동쪽 <strong>수정 균열</strong>(별빛 광산 진입로, 벽 점프 게이트)</td>
+</tr>
+<tr>
+<td>Z3 미궁</td>
+<td>서쪽 <strong>용암 지맥 통로</strong>(모루골), 하층 의문의 문 연출 강화(개문 이벤트)</td>
+</tr>
+<tr>
+<td>Z4 해안</td>
+<td>등대 뒤 <strong>서리 산길</strong>(서리고개 진입로), <strong>해식 동굴</strong>(썰물 때만 — 미궁 하층 연결)</td>
+</tr>
+<tr>
+<td>Z5 화산</td>
+<td><strong>불꽃 투기장</strong>(연무관! 웨이브 전투 + 재도전 보스 러시), <strong>용암 동굴</strong>(모루골 지름길 — 화산이 본토와 이어짐)</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="h20">4. 학교가 심장인 이유 — 배움과 탐험의 이중 나선</h2>
+<p>세계가 커져도 게임의 정체성은 &quot;마법학교&quot;다. 두 축이 서로를 끌어당긴다:</p>
+<pre><code>   [학교 축 — 정규 과정]                [세계 축 — 모험]
+   교수 수업 (공격 마법 7식)    ⇄    이동 술식 6종 (사당·은둔 스승)
+   이론 수업·과제·시험          ⇄    현장 학습 퀘스트 (각 존 1~2개)
+   학기 진행(Act 마디)          ⇄    존 해금·게이트 개방
+   훈련실 강화                  ⇄    모루골 단조·각인 제작
+   도서관 지식                  ⇄    기록판·유령 서사 (세계의 역사)
+</code></pre>
+<ul>
+<li><strong>현장 학습 시스템 ★신설</strong>: 교수들이 &quot;다음 수업 전까지 ○○ 지역에서 △△를 관찰/수집해 오라&quot;는 과제를 냄 — 학교가 플레이어를 세계로 밀어내고, 세계에서 얻은 것이 수업(스킬 습득 조건)으로 돌아온다. 예: 이그니아 &quot;관통 이론 심화 — 별빛 광산의 수정 굼벵이 껍질 3개&quot;.</li>
+<li><strong>은둔 스승 3인</strong>: 유키네(빙설 비전), 브란(단조), 유령 교장(섬화) — &quot;학교 밖에도 스승이 있다&quot;. 단 모든 비전은 정규 화염술 숙련이 선행 조건 — 학교가 뿌리임을 유지.</li>
+<li><strong>세계관 일원화</strong>: 제1 아카데미의 몰락(재의 거리) → 현 아카데미의 설립 → 의문의 문·금서·폐과가 전부 한 줄기 역사. &quot;이 대륙 전체가 하나의 학교이자 그 흔적&quot;이다.</li>
+</ul>
+<hr>
+<h2 id="h21">5. 게이트 매트릭스 — 성장이 지도를 다시 그린다</h2>
+<table>
+<thead>
+<tr>
+<th>게이트 → 능력</th>
+<th>없음</th>
+<th>이중점프</th>
+<th>벽점프</th>
+<th>도깨비불</th>
+<th>유성질주</th>
+<th>활공</th>
+<th>섬화</th>
+<th>스토리/열쇠</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Z6 서리고개 진입</td>
+<td></td>
+<td>●</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Z7 얼음 마을 진입</td>
+<td>●(고개 경유)</td>
+<td></td>
+<td>빙벽 구간●</td>
+<td></td>
+<td>호수밑 균열●</td>
+<td>신사 위●</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Z8 광산 진입</td>
+<td>●(미궁 경유)</td>
+<td></td>
+<td>숲 균열●</td>
+<td>심부●</td>
+<td>레일망●</td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Z9 모루골 진입</td>
+<td>●(카타콤 경유)</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td>내열 각인(하부)●</td>
+</tr>
+<tr>
+<td>Z10 부유 정원</td>
+<td></td>
+<td>●+</td>
+<td>●+</td>
+<td></td>
+<td></td>
+<td>후반부●</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Z11 재의 거리</td>
+<td></td>
+<td></td>
+<td></td>
+<td>유령 대화●</td>
+<td></td>
+<td></td>
+<td>장막 구간●</td>
+<td>의문의 문●</td>
+</tr>
+<tr>
+<td>Z12 신전</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td>●</td>
+<td>세 인장●</td>
+</tr>
+<tr>
+<td>화산↔모루골 지름길</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td>●(암벽)</td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody></table>
+<ul>
+<li>읽는 법: 어느 존이든 <strong>기본 진입로는 능력 0~1개</strong>로 열리고, 존의 심부·비밀·지름길이 상위 능력을 요구한다 — &quot;들어갈 순 있지만 다 볼 수는 없다&quot; = 재방문 동기.</li>
+<li>하드 록은 <strong>의문의 문(스토리)과 세 인장(수집)</strong> 둘뿐 — 나머지는 전부 능력 소프트 게이트.</li>
+</ul>
+<h2 id="h22">6. 액트 흐름 (강제가 아닌 물길)</h2>
+<table>
+<thead>
+<tr>
+<th>Act</th>
+<th>학교 이벤트</th>
+<th>자연스럽게 열리는 세계</th>
+<th>이동술</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1 입학</td>
+<td>오리엔테이션~초급 3식</td>
+<td>언덕·숲·미궁 상층·해안 (현행)</td>
+<td>(기본기)</td>
+</tr>
+<tr>
+<td>2 진급</td>
+<td>실기 시험~중급 2식</td>
+<td>캐노피 사당→<strong>설산길</strong>, 카타콤 사당→<strong>광산 초입</strong></td>
+<td>이중점프·벽점프</td>
+</tr>
+<tr>
+<td>3 심화</td>
+<td>고급 1식(홍염의 서)</td>
+<td><strong>얼음 마을·별빛 광산 심부·모루골</strong>, 천문대→<strong>부유 정원</strong></td>
+<td>도깨비불·유성질주·활공</td>
+</tr>
+<tr>
+<td>4 졸업 시험</td>
+<td>고급 2식(불의 마을)</td>
+<td><strong>의문의 문 개방→재의 거리</strong>, 투기장</td>
+<td>섬화</td>
+</tr>
+<tr>
+<td>5 최종장</td>
+<td>(추후 빌런 기획)</td>
+<td>세 인장→<strong>신전</strong></td>
+<td>—</td>
+</tr>
+</tbody></table>
+<h2 id="h23">7. 구현 로드맵</h2>
+<table>
+<thead>
+<tr>
+<th>버전</th>
+<th>내용</th>
+<th>규모</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>v0.16</strong></td>
+<td><strong>무브먼트 오버홀</strong>(§2.1 전항목) + 이동 술식 3종(이중점프·벽점프·도깨비불)과 사당 + 게이트 1차(균열 벽·가시덤불) + 천문대·수정 균열·서리 산길 티저</td>
+<td>大</td>
+</tr>
+<tr>
+<td><strong>v0.17</strong></td>
+<td><strong>별빛 광산 + 유성 질주(레일)</strong> + 모루골(각인 제작·단조) + 화산 투기장</td>
+<td>大</td>
+</tr>
+<tr>
+<td><strong>v0.18</strong></td>
+<td><strong>서리고개+얼음 마을</strong>(온기 게이지·유키네 비전) + <strong>부유 정원</strong>(기류·활공)</td>
+<td>大</td>
+</tr>
+<tr>
+<td><strong>v0.19</strong></td>
+<td><strong>재의 거리</strong>(유령 서사·거울 보스·섬화) + <strong>신전</strong>(세 인장·봉인 회랑) + 안개 지도·아르카 마법진</td>
+<td>大</td>
+</tr>
+<tr>
+<td>이후</td>
+<td>최종 빌런 서사, 겨울 축제, 호수 밑 확장, 부적 심화</td>
+<td>—</td>
+</tr>
+</tbody></table>
+<p><strong>변함없는 원칙</strong>: SAVE_KEY 유지, 모든 버전에서 기존 세이브 마이그레이션. 신규 시스템은 무결점 기본값으로 시작.</p>
+<h2 id="h24">8. 승인 요청</h2>
+<ol>
+<li><strong>월드 아틀라스(§1) 12존 구도</strong> — 이대로 확정?</li>
+<li><strong>무브먼트 오버홀(§2.1) 수치 방향</strong> — 동의? (v0.16 최우선 적용)</li>
+<li><strong>온기 게이지 / 유성 질주 레일 / 상승 기류 / 재의 장막</strong> — 존 고유 기믹 4종 컨셉 승인?</li>
+<li><strong>은둔 스승 3인 + 현장 학습 시스템</strong> — 학교-세계 연결 방식 동의?</li>
+<li>승인 시 **v0.16 (무브먼트 오버홀 + 이동 술식 3종 + 게이트 1차)**부터 착수.</li>
+</ol>
+
+</main>
+</div>
+</body>
+</html>
