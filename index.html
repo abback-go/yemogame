@@ -56,12 +56,17 @@ const SKILL = {
   inferno: { key:"Q", cd: 8, mpStart: 10, drain: 13, dmg: [7, 10], tick: 0.15,
              range: 760, rampT: 2.6, rampMax: 2.6, name: "인페르노 번",
              desc:"시선의 적을 태우는 고열 광선. 유지할수록 화력이 몇 배로 치솟는다. (고급 마법 제1식)" },
+  // ★ 고급 마법 제2식 — 불의 마을 퀘스트로 습득
+  meltdown:{ key:"R", cd: 24, mp: 65, dmg: [34, 48], tick: 0.16, dur: 2.6, radius: 118, name: "멸화",
+             desc:"하늘을 갈라 무수한 별똥별을 쏟아붓는 대재앙. 화면 전체의 적을 불바다로 태운다. (고급 마법 제2식)" },
 };
 const CRIT_MUL = 1.5;
 const MAX_SKILL_LV = 5;
-const SKILL_ORDER = ["bolt","fireball","field","lance","nova","inferno"];
+const SKILL_ORDER = ["bolt","fireball","field","lance","nova","inferno","meltdown"];
 // 고급 마법 퀘스트 체인 인덱스
 const QI_TALK = 8, QI_BANNED = 9, QI_BATS = 10, QI_TOME = 11, QI_EXAM = 12;
+// 고급 마법 제2식 「멸화」 퀘스트 체인 (불의 마을)
+const QI_M2_TALK = 13, QI_M2_SAIL = 14, QI_M2_TRIAL = 15, QI_M2_EMBER = 16, QI_M2_LESSON = 17;
 
 // --- 스탯 랭크 시스템 (D- ~ SSS) : 기획서 §6.1
 const RANKS = ["D-","D","D+","C-","C","C+","B-","B","B+","A-","A","A+","S","SS","SSS"];
@@ -82,6 +87,8 @@ const MOB_DEFS = {
   mushroom: { name:"주황버섯",   hp: 62,     w: 34, h: 40, speed: 74,  dmg: 15, exp: 15, color:"#e8843c", contact:true  },
   boss:     { name:"숲의 수호자 그루트닉", hp: 620, w: 92, h: 116, speed: 0, dmg: 20, exp: 220, color:"#5e7a4a", contact:true },
   bat:      { name:"그림자 박쥐", hp: 26, w: 24, h: 20, speed: 72, dmg: 9, exp: 10, color:"#2a2438", contact:true, float:true },
+  ember:    { name:"화염 정령", hp: 130, w: 30, h: 34, speed: 92, dmg: 18, exp: 45, color:"#ff7b3a", contact:true, float:true },
+  firelord: { name:"화염 군주 이그니스", hp: 1050, w: 86, h: 112, speed: 42, dmg: 30, exp: 620, color:"#ff5030", contact:true },
 };
 const RESPAWN_TIME = 5.0;
 
@@ -444,12 +451,38 @@ const MAPS = {
     ],
     portals: [ { x: 110, y: 640, to: "village", tx: 2450, ty: 640, label: "여명 마을" } ],
     npcs: [
-      { kind: "info", name: "선원", x: 900, lines: [
-        "여어, 학생! 여긴 소금바람 항구야.",
-        "저 배로 다른 지역에 갈 수 있지만… 아직 출항 준비 중이라네.",
-        "다음에 다시 오게. 바다 건너엔 볼거리가 많거든!" ] },
+      { kind: "sailor", name: "선원", x: 900 },
     ],
     mobs: [],
+  },
+
+  // ---------- 불의 마을 (고급 마법 제2식 「멸화」 퀘스트) ----------
+  firevil: {
+    name: "불의 마을 — 화산 기슭", w: 3200, theme: "volcano",
+    platforms: [
+      { x: 780,  y: 520, w: 170, h: 14 },
+      { x: 1180, y: 460, w: 170, h: 14 },
+      { x: 1600, y: 520, w: 190, h: 14 },
+      { x: 2120, y: 470, w: 190, h: 14 },
+    ],
+    signs: [
+      { x: 320,  text: "불의 마을 — 살아있는 화산의 기슭" },
+      { x: 1000, text: "경고: 화산 정상엔 화염 군주가 잠들어 있다" },
+      { x: 2500, text: "분화구 — 화염 군주 이그니스의 둥지" },
+    ],
+    portals: [ { x: 150, y: 640, to: "harbor", tx: 900, ty: 640, label: "항구로 (배)", tint: "#7dd3fc", door: true } ],
+    npcs: [
+      { kind: "info", name: "화산지기", x: 500, lines: [
+        "바다 건너 여기까지 오다니… 대마도사님이 보낸 아이로군.",
+        "『멸화의 불씨』는 저 정상, 화염 군주 이그니스의 심장에 있다.",
+        "놈을 쓰러뜨려야만 불씨가 떨어진다. 각오가 됐다면 올라가거라." ] },
+      { kind: "heal", name: "불의 마을 치유사", x: 780, lines: [
+        "화상은 이 몸에게 맡기렴. 몸도 마나도 다시 채워주마." ] },
+    ],
+    mobs: [
+      ["ember", 1350, 1200, 1550], ["ember", 1750, 1600, 1950], ["ember", 2200, 2050, 2350],
+      ["firelord", 2700, 2700, 2700],
+    ],
   },
 };
 
@@ -494,6 +527,8 @@ function loadMap(id, spawnX, spawnY){
   }
   spikes.length = 0; eprojs.length = 0;
   projectiles.length = 0; fields.length = 0;
+  meteors.length = 0; melt = null; meltFlash = 0;
+  if(player) player.infernoOn = false;
   particles.length = 0; dmgNumbers.length = 0; floatTexts.length = 0;
   player.x = clamp(spawnX, P.w/2, mapW - P.w/2);
   player.y = spawnY ?? GROUND_Y; player.vx = 0; player.vy = 0;
@@ -509,12 +544,14 @@ const player = {
   dashTimer: 0, dashCd: 0, dashDir: 1,
   boltCd: 0, fbCharge: -1, fbCd: 0, fieldCd: 0, lanceCd: 0, novaCd: 0,
   infernoOn: false, infernoT: 0, infernoTick: 0, infernoCd: 0, infernoHitX: null,
+  meltCd: 0,
+  hasEmber: false,   // 『멸화의 불씨』 획득 여부 (제2식 수업 전제)
   hp: P.maxHp, mp: P.maxMp,
   level: 1, exp: 0,
   // ★ 스킬 제로 스타트 (§7.0): 모든 마법은 수업으로 습득
-  skills: { bolt: false, fireball: false, field: false, lance: false, nova: false, inferno: false },
+  skills: { bolt: false, fireball: false, field: false, lance: false, nova: false, inferno: false, meltdown: false },
   // 스킬 강화 레벨 (1~MAX_SKILL_LV) — 교관/수업으로 상승
-  skillLv: { bolt: 1, fireball: 1, field: 1, lance: 1, nova: 1, inferno: 1 },
+  skillLv: { bolt: 1, fireball: 1, field: 1, lance: 1, nova: 1, inferno: 1, meltdown: 1 },
   stats: {
     str:{ r:1, tp:0, act:0 }, mag:{ r:1, tp:0, act:0 }, agi:{ r:1, tp:0, act:0 },
     vit:{ r:1, tp:0, act:0 }, wil:{ r:1, tp:0, act:0 },
@@ -600,6 +637,17 @@ const QUESTS = [
     rewards:[["mag","특대"]], exp:250 },
   { name:"대마도사의 시험", desc:"「인페르노 번」 수업 이수 — 광선(Q)으로 30회 지지기", type:"lesson", target:"inferno", need:1,
     rewards:[["mag","특대"],["wil","대"]], exp:400 },
+  // ---------- 고급 마법 제2식 「멸화」 퀘스트 체인 (§7.9 — 불의 마을) ----------
+  { name:"붉은 편지",      desc:"대마도사에게 제2식 「멸화」에 대해 듣기 (고급 강의실)", type:"talk", target:"master2", need:1,
+    rewards:[["wil","대"]], exp:200 },
+  { name:"불의 마을로",    desc:"소금바람 항구에서 배를 타고 '불의 마을'로 건너가기", type:"talk", target:"sailor", need:1,
+    rewards:[["agi","중"]], exp:150 },
+  { name:"화산의 시련",    desc:"불의 마을 화산 기슭에서 「화염 군주 이그니스」 격파", type:"kill", target:"firelord", need:1,
+    rewards:[["str","대"],["vit","대"],["mag","대"]], exp:600 },
+  { name:"멸화의 불씨",    desc:"쓰러진 화염 군주가 남긴 『멸화의 불씨』 회수 (E)", type:"inspect", target:"ember", need:1,
+    rewards:[["mag","특대"]], exp:300 },
+  { name:"제2식 전수",     desc:"대마도사에게 돌아가 「멸화」 수업 이수", type:"lesson", target:"meltdown", need:1,
+    rewards:[["mag","특대"],["wil","특대"]], exp:700 },
 ];
 const questState = { idx: 0, prog: 0, doneAll: false, banner: null };
 function curQuest(){ return questState.doneAll ? null : QUESTS[questState.idx]; }
@@ -680,23 +728,49 @@ const TEACHERS = [
     lessons:[
       { skill:"inferno", name:"인페르노 번", task:"infernoHit", need:30,
         desc:"광선(Q 유지)으로 몬스터 30회 지지기", rewards:[["mag","특대"],["wil","대"]], exp:400,
+        req: ()=> questState.idx >= QI_EXAM || questState.doneAll,
+        reqText: "『홍염의 서』 회수 후 전수받을 수 있다.",
         lines:[
           "『홍염의 서』… 정말 가져왔군. 그 어둠 속을 뚫고서. 자네를 인정하지.",
           "고급 마법 제1식 — 「인페르노 번」. 시선의 끝을 태워 없애는 멸살의 광선이다.",
           "Q를 누르고 있게. 오래 지질수록 화력이 몇 배로 치솟지. 단, MP를 계속 태운다.",
           "몬스터를 30회 지지면, 그 술식은 완전히 자네 것이다.",
         ] },
+      { skill:"meltdown", name:"멸화", task:"meltdownHit", need:12,
+        desc:"「멸화」(R)로 몬스터 12회 타격", rewards:[["mag","특대"],["wil","특대"]], exp:700,
+        req: ()=> player.hasEmber,
+        reqText: "불의 마을에서 『멸화의 불씨』를 가져와야 전수받을 수 있다.",
+        lines:[
+          "『멸화의 불씨』… 화염 군주의 심장이 아직도 타오르는군. 살아 돌아왔구나.",
+          "고급 마법 제2식 — 「멸화」. 하늘을 갈라 무수한 별똥별을 쏟아붓는 대재앙이다.",
+          "R을 누르면 화면 전체가 불바다가 되지. 강대한 만큼 마나도, 재사용도 무겁다.",
+          "몬스터를 12회 불태우면, 이 학교가 가르칠 수 있는 마지막 술식이 자네 것이 된다.",
+        ] },
     ] },
 ];
 const teacherState = {};
-TEACHERS.forEach(t => teacherState[t.id] = { idx: 0, prog: 0, active: false });
+TEACHERS.forEach(t => teacherState[t.id] = { learning: null, prog: 0 });
 
+// 수업(스킬) 하나의 상태: 이수 완료 / 진행 중 / 배우기 가능 / 잠김
+function lessonPrereqMet(t, li){
+  const ls = t.lessons[li];
+  if(ls.req && !ls.req()) return false;
+  if(li > 0 && !player.skills[t.lessons[li-1].skill]) return false;   // 같은 교수의 이전 술식 선행
+  return true;
+}
+function lessonStatus(t, li){
+  const ls = t.lessons[li], st = teacherState[t.id];
+  if(player.skills[ls.skill]) return "done";
+  if(st.learning === ls.skill) return "active";
+  return lessonPrereqMet(t, li) ? "avail" : "locked";
+}
 function activeLessons(){
   const out = [];
   for(const t of TEACHERS){
     const st = teacherState[t.id];
-    if(st.active && st.idx < t.lessons.length)
-      out.push(Object.assign({ teacher: t, st }, t.lessons[st.idx]));
+    if(!st.learning) continue;
+    const ls = t.lessons.find(l => l.skill === st.learning);
+    if(ls && !player.skills[ls.skill]) out.push(Object.assign({ teacher: t, st }, ls));
   }
   return out;
 }
@@ -747,7 +821,7 @@ function lessonEvent(task){
 }
 function completeLesson(al){
   player.skills[al.skill] = true;
-  al.st.active = false; al.st.prog = 0; al.st.idx++;
+  al.st.learning = null; al.st.prog = 0;
   for(const [k,s] of al.rewards) trainStat(k, TRAIN_SIZE[s], false);
   gainExp(al.exp);
   questEvent("lesson", al.skill);
@@ -766,6 +840,7 @@ function talkNPC(n){
     showTrainer = true;
     return;
   }
+  if(n.kind === "sailor"){ talkToSailor(n); return; }
   if(n.kind === "heal"){
     player.hp = maxHp(); player.mp = maxMp();
     spawnParticles(player.x, player.y - 24, { n: 26, col: ["#8be9fd","#a3e635","#fff"], sp0: 40, sp1: 220, l0: .3, l1: .7, add: true, grav: -40 });
@@ -790,12 +865,70 @@ function advanceDialog(){
     if(cb) cb();
   }
 }
+
+// ---- 배편(선원): 불의 마을 왕래 ----
+function canSail(){ return questState.idx >= QI_M2_SAIL || player.hasEmber || player.skills.meltdown; }
+function talkToSailor(n){
+  if(!canSail()){
+    startDialog(n.lines || [
+      "여어, 학생! 여긴 소금바람 항구야.",
+      "저 배로 다른 지역에 갈 수 있지만… 아직 출항 준비 중이라네.",
+      "다음에 다시 오게. 바다 건너엔 볼거리가 많거든!" ], null, n.name);
+    return;
+  }
+  startDialog([
+    "오, 대마도사님의 배편이 자네였군! 준비는 됐네.",
+    "저 너머 '불의 마을'로 데려다주지. …화산이라 뜨거우니 각오하게!",
+  ], ()=>{ questEvent("talk", "sailor"); startTransition("firevil", 240, GROUND_Y); }, n.name);
+}
+
+// ============================== 수업 선택 창 (학생 수첩식) ==============================
+let learnUI = null;   // { t, opts:[{li, skill, status}], sel }
+function openLearn(t){
+  const opts = t.lessons.map((ls, li)=> ({ li, skill: ls.skill, status: lessonStatus(t, li) }));
+  // 첫 커서: 배우기 가능 → 진행 중 → 그 외
+  let sel = opts.findIndex(o => o.status === "avail");
+  if(sel < 0) sel = opts.findIndex(o => o.status === "active");
+  if(sel < 0) sel = 0;
+  learnUI = { t, opts, sel };
+}
+function learnMove(d){
+  if(!learnUI) return;
+  const n = learnUI.opts.length;
+  learnUI.sel = (learnUI.sel + d + n) % n;
+}
+function learnConfirm(){
+  if(!learnUI) return;
+  const t = learnUI.t, o = learnUI.opts[learnUI.sel];
+  const ls = t.lessons[o.li], st = teacherState[t.id];
+  const status = lessonStatus(t, o.li);
+  const sp = t.name + " — " + t.title;
+  if(status === "done"){
+    addFloatText(player.x, player.y - P.h - 40, "이미 이수한 술식이다", "#94a3b8"); return;
+  }
+  if(status === "locked"){
+    startDialog([ls.reqText || "아직 이 술식을 배울 수 없다."], null, sp);
+    learnUI = null; return;
+  }
+  if(status === "active"){
+    startDialog([`과제 진행 중일세: ${ls.desc}  (${st.prog}/${ls.need})`], null, sp);
+    learnUI = null; return;
+  }
+  // avail → 다른 진행 중 수업이 있으면 교체(한 교수당 하나만 진행)
+  learnUI = null;
+  startDialog(ls.lines, ()=>{
+    st.learning = ls.skill; st.prog = 0;
+    addFloatText(player.x, player.y - P.h - 60, "수업 시작: " + ls.name, "#8be9fd");
+    addFloatText(player.x, player.y - P.h - 34, `임시 각인: ${SKILL[ls.skill].name} (${SKILL[ls.skill].key})`, "#ffb35c");
+    saveGame();
+  }, sp);
+}
+function masterChainDone(){ return questState.idx >= QI_EXAM || questState.doneAll; }
 function talkToTeacher(t){
-  const st = teacherState[t.id];
   if(t.unlock && !t.unlock()){ startDialog([t.lockText], null, "??? — " + t.title); return; }
-  // 대마도사: 『홍염의 서』 퀘스트 체인을 마쳐야 수업 개방
-  if(t.id === "master" && !(questState.idx >= QI_EXAM || questState.doneAll)){
-    const sp = t.name + " — " + t.title;
+  const sp = t.name + " — " + t.title;
+  // 대마도사: 『홍염의 서』 퀘스트 체인을 마쳐야 제1식 수업 개방
+  if(t.id === "master" && !masterChainDone()){
     if(questState.idx < QI_TALK){
       startDialog(["…나는 발더스. 고급 화염술을 다루지.",
         "허나 지금은 때가 아니다. 남은 학사 일정(퀘스트)부터 마치고 오게."], null, sp);
@@ -814,38 +947,46 @@ function talkToTeacher(t){
     }
     return;
   }
-  if(st.idx >= t.lessons.length){
+  // 대마도사: 제1식 이수 후 → 제2식 「멸화」 퀘스트 개시 (불의 마을로 안내)
+  if(t.id === "master" && player.skills.inferno && questState.idx === QI_M2_TALK){
+    startDialog([
+      "「인페르노 번」이 완전히 자네 것이 되었군. …허나 그건 시작에 불과하다.",
+      "제2식 「멸화」 — 하늘을 통째로 불사르는 술식이다. 헌데 이 학교엔 그 불씨가 없다.",
+      "바다 건너 '불의 마을'. 그 화산 기슭에 잠든 화염 군주의 심장… 『멸화의 불씨』가 필요하다.",
+      "소금바람 항구로 가게. 배편을 열어 두었네. 살아 돌아온다면, 나머지를 가르쳐 주지.",
+    ], ()=>{ questEvent("talk", "master2"); }, sp);
+    return;
+  }
+  // 배울 것이 없으면(모두 이수) 마무리 대사
+  const learnable = t.lessons.some((_, li)=>{ const s = lessonStatus(t, li); return s === "avail" || s === "active"; });
+  const allDone = t.lessons.every((_, li)=> lessonStatus(t, li) === "done");
+  if(allDone){
     if(t.id === "master"){
       startDialog([
-        "「인페르노 번」을 다루는 모습이 제법이군.",
-        "고급 마법 제2식 『멸화』… 하늘을 통째로 태우는 술식이지만, 아직은 이르다.",
-        "때가 되면 다시 부르지.",
-      ], null, t.name + " — " + t.title);
+        "제1식과 제2식… 이 학교가 전할 수 있는 화염술은 여기까지다.",
+        "그 다음은 스스로 개척하는 길뿐. 훌륭한 대마도사가 되었군.",
+      ], null, sp);
       return;
     }
-    startDialog(["내 가르침은 모두 전수했다. 훌륭한 화염술사가 되었군!", "다음 과정의 교수를 찾아가 보게."], null, t.name + " — " + t.title);
+    startDialog(["내 가르침은 모두 전수했다. 훌륭한 화염술사가 되었군!", "다음 과정의 교수를 찾아가 보게."], null, sp);
     return;
   }
-  const ls = t.lessons[st.idx];
-  if(st.active){
-    startDialog([`과제 진행 중일세: ${ls.desc}  (${st.prog}/${ls.need})`], null, t.name + " — " + t.title);
+  if(!learnable){   // 아직 선행 조건 미충족 (예: 불씨 미회수)
+    const li = t.lessons.findIndex((_, i)=> lessonStatus(t, i) === "locked");
+    const rt = li >= 0 && t.lessons[li].reqText ? t.lessons[li].reqText : "아직 배울 수 있는 술식이 없네.";
+    startDialog([rt], null, sp);
     return;
   }
-  startDialog(ls.lines, ()=>{
-    st.active = true;
-    addFloatText(player.x, player.y - P.h - 60, "수업 시작: " + ls.name, "#8be9fd");
-    addFloatText(player.x, player.y - P.h - 34, `임시 각인: ${SKILL[ls.skill].name} (${SKILL[ls.skill].key})`, "#ffb35c");
-    saveGame();
-  }, t.name + " — " + t.title);
+  // ★ 수업 선택 창 열기 (학생 수첩식 UI)
+  openLearn(t);
 }
 function nextLessonInfo(){
   const al = activeLesson();
   if(al) return { type: "active", al };
   for(const t of TEACHERS){
     if(t.unlock && !t.unlock()) continue;
-    if(t.id === "master" && !(questState.idx >= QI_EXAM || questState.doneAll)) continue;   // 퀘스트 체인 선행
-    const st = teacherState[t.id];
-    if(st.idx < t.lessons.length) return { type: "avail", t };
+    if(t.id === "master" && !masterChainDone()) continue;   // 퀘스트 체인 선행
+    if(t.lessons.some((_, li)=> lessonStatus(t, li) === "avail")) return { type: "avail", t };
   }
   return null;
 }
@@ -875,6 +1016,20 @@ function pickupTome(){
     addFloatText(player.x, player.y - 96, "『홍염의 서』를 손에 넣었다!", "#ff6b6b");
     saveGame();
   }, "『홍염의 서』");
+}
+function pickupEmber(){
+  startDialog([
+    "쓰러진 화염 군주의 가슴에서… 사그라들지 않는 불덩이가 굴러 나온다.",
+    "『멸화의 불씨』다. 손에 쥐자 팔뚝의 핏줄까지 뜨겁게 타오른다.",
+    "이거다. 대마도사에게 가져가면, 제2식을 전수받을 수 있을 것이다!",
+  ], ()=>{
+    player.hasEmber = true;
+    questEvent("inspect", "ember");
+    juice.addShake(0.5); juice.flash = Math.max(juice.flash, 0.45);
+    spawnParticles(player.x, GROUND_Y - 40, { n: 34, col: ["#ff5030","#ffb35c","#ffe08a","#fff"], sp0: 90, sp1: 360, l0: .3, l1: .8, add: true, grav: -50 });
+    addFloatText(player.x, player.y - 96, "『멸화의 불씨』를 손에 넣었다!", "#ff8040");
+    saveGame();
+  }, "『멸화의 불씨』");
 }
 
 // 의문의 문 — 잠긴 채 불길한 대사만 (미래 콘텐츠 훅)
@@ -961,6 +1116,76 @@ function castNova(){
   }
 }
 
+// --- 멸화 (고급 제2식: 화면 전체 별똥별 대재앙)
+let melt = null;        // { t, dur, spawnT, lv, tier }
+const meteors = [];     // { x, y, vx, vy, ty, tier, r }
+let meltFlash = 0;      // 하늘 붉게 물드는 오버레이(0~1)
+function castMeltdown(){
+  const pl = player;
+  const lv = getSkillLv("meltdown"), tier = skillTier("meltdown");
+  pl.mp -= SKILL.meltdown.mp;
+  pl.meltCd = SKILL.meltdown.cd;
+  pl.castT = 0.4;
+  pl.iframes = Math.max(pl.iframes, 0.5);
+  melt = { t: 0, dur: SKILL.meltdown.dur + 0.25 * (lv - 1), spawnT: 0, tickT: 0, lv, tier };
+  meltFlash = 1;
+  juice.addShake(1.0); juice.addHitstop(0.14); juice.flash = Math.max(juice.flash, 0.5);
+  questBanner("멸화 발동!", "하늘이 갈라지고 별똥별이 쏟아진다 — 화면 전체가 불바다!", "");
+}
+function spawnMeteor(){
+  const lv = melt.lv, tier = melt.tier;
+  // 화면 상단 바깥에서 대각선으로 낙하 → 시야 하단(지면 근처)에 충돌
+  const x = camX + rand(-120, VIEW_W + 40);
+  const ty = camY + rand(VIEW_H * 0.52, VIEW_H - 60);
+  const y = camY - rand(40, 180);
+  const speed = rand(1500, 2000);
+  meteors.push({ x, y, vx: rand(140, 240), vy: speed, ty, tier, r: 7 + rand(0, 5) + lv });
+}
+function meteorImpact(mt){
+  const tier = mt.tier;
+  const R = SKILL.meltdown.radius * 0.7;
+  explosions.push({ x: mt.x, y: mt.ty, r: R, t: 0, life: 0.34, col: tier === 2 ? "120,180,255" : "255,150,60" });
+  explosions.push({ x: mt.x, y: mt.ty, r: R * 0.55, t: 0, life: 0.24, col: tier === 2 ? "190,227,255" : "255,220,140" });
+  juice.addShake(0.16);
+  const cols = tier === 2 ? ["#7cc4ff","#bfe3ff","#eaf6ff","#fff"] : ["#ff5030","#ff9d4d","#ffe08a","#fff"];
+  spawnParticles(mt.x, mt.ty, { n: 14, col: cols, sp0: 80, sp1: 360, l0: .2, l1: .55, add: true, grav: 300 });
+}
+function updateMeltdown(dt){
+  if(meltFlash > 0) meltFlash = Math.max(0, meltFlash - dt * 0.9);
+  if(melt){
+    melt.t += dt; melt.spawnT += dt; melt.tickT += dt;
+    // 운석 낙하 밀도: 레벨이 높을수록 촘촘하게
+    const interval = Math.max(0.045, 0.10 - 0.01 * (melt.lv - 1));
+    while(melt.spawnT >= interval){
+      melt.spawnT -= interval;
+      if(melt.t < melt.dur) spawnMeteor();
+    }
+    // 화면 전체 화염 폭풍 틱: 화면 안 모든 적에게 지속 피해 (6차 스킬식 절멸)
+    if(melt.t < melt.dur && melt.tickT >= SKILL.meltdown.tick){
+      melt.tickT -= SKILL.meltdown.tick;
+      const vx0 = camX - 40, vx1 = camX + VIEW_W + 40, vy0 = camY - 40, vy1 = camY + VIEW_H + 40;
+      for(const m of monsters){
+        if(m.dead) continue;
+        const r = mobRect(m);
+        const cx = r.x + r.w/2, cy = r.y + r.h/2;
+        if(cx < vx0 || cx > vx1 || cy < vy0 || cy > vy1) continue;
+        hitMonster(m, Math.floor(irand(SKILL.meltdown.dmg[0], SKILL.meltdown.dmg[1]) * magMul() * skillLvMul("meltdown")),
+                   140 * sign(cx - player.x || 1), { type: "meltdown", hitstop: 0, shake: 0.05 });
+      }
+    }
+    if(melt.t >= melt.dur && meteors.length === 0) melt = null;
+  }
+  // 운석 낙하 업데이트 (연출)
+  for(let i = meteors.length - 1; i >= 0; i--){
+    const mt = meteors[i];
+    mt.x += mt.vx * dt; mt.y += mt.vy * dt;
+    if(Math.random() < 0.9)
+      spawnParticles(mt.x, mt.y, { n: 1, col: mt.tier === 2 ? ["#7cc4ff","#eaf6ff"] : ["#ff6a3a","#ffd27f"],
+        sp0: 4, sp1: 24, l0: .12, l1: .3, add: true, r0: 2, r1: 4 });
+    if(mt.y >= mt.ty){ meteorImpact(mt); meteors.splice(i, 1); }
+  }
+}
+
 // ============================== SAVE (localStorage) ==============================
 const SAVE_KEY = "arcane_proto_save_v3";
 let saveTimer = 8, saveFlash = 0, resetArm = 0;
@@ -968,7 +1193,7 @@ function saveGame(){
   try{
     localStorage.setItem(SAVE_KEY, JSON.stringify({
       v: 3, level: player.level, exp: player.exp, stats: player.stats,
-      skills: player.skills, skillLv: player.skillLv,
+      skills: player.skills, skillLv: player.skillLv, hasEmber: player.hasEmber,
       quest: { idx: questState.idx, prog: questState.prog, doneAll: questState.doneAll },
       teachers: Object.fromEntries(TEACHERS.map(t=>[t.id, teacherState[t.id]])),
       bossDefeated: boss.defeated,
@@ -985,17 +1210,24 @@ function loadGame(){
     for(const k in player.stats) if(d.stats && d.stats[k]) player.stats[k] = d.stats[k];
     if(d.skills) Object.assign(player.skills, d.skills);
     if(d.skillLv) Object.assign(player.skillLv, d.skillLv);
+    player.hasEmber = !!d.hasEmber;
     if(d.quest) Object.assign(questState, d.quest);
     // 마이그레이션: 퀘스트가 늘어난 뒤엔 doneAll을 재계산 (구버전 doneAll=true가 신규 체인을 건너뛰던 버그 수정)
     questState.idx = clamp(questState.idx || 0, 0, QUESTS.length);
     questState.doneAll = questState.idx >= QUESTS.length;
-    if(d.teachers) for(const id in teacherState) if(d.teachers[id]) Object.assign(teacherState[id], d.teachers[id]);
-    // 마이그레이션: 아직 못 배운 스킬의 수업이 '완료' 처리돼 있으면 되돌림
-    for(const t of TEACHERS){
-      const st = teacherState[t.id];
-      for(let i = 0; i < st.idx && i < t.lessons.length; i++){
-        if(!player.skills[t.lessons[i].skill]){ st.idx = i; st.active = false; st.prog = 0; break; }
+    // 교사 수업 상태 로드 (신규 {learning,prog} / 구버전 {idx,active,prog} 모두 호환)
+    if(d.teachers) for(const id in teacherState){
+      const src = d.teachers[id]; if(!src) continue;
+      const t = teacherByRef(id), st = teacherState[id];
+      if(src.learning !== undefined){ st.learning = src.learning; st.prog = src.prog || 0; }
+      else{
+        // 구버전: idx=이수한 수업 수(순차), active=진행 중 여부
+        const li = src.idx || 0;
+        st.learning = (src.active && t && li < t.lessons.length && !player.skills[t.lessons[li].skill]) ? t.lessons[li].skill : null;
+        st.prog = st.learning ? (src.prog || 0) : 0;
       }
+      // 안전장치: 이미 배운(또는 존재하지 않는) 스킬이 진행 중이면 해제
+      if(st.learning && (player.skills[st.learning] || !t.lessons.some(l => l.skill === st.learning))){ st.learning = null; st.prog = 0; }
     }
     if(d.bossDefeated) boss.defeated = true;
     combo.best = d.best || 0;
@@ -1015,7 +1247,7 @@ function updatePlayer(dt){
     return;
   }
 
-  const locked = dialog !== null || showBook || showTrainer || showWorldMap || transition !== null;
+  const locked = dialog !== null || showBook || showTrainer || showWorldMap || learnUI !== null || transition !== null;
 
   // --- 타이머
   pl.boltCd = Math.max(0, pl.boltCd - dt);
@@ -1024,6 +1256,7 @@ function updatePlayer(dt){
   pl.lanceCd = Math.max(0, pl.lanceCd - dt);
   pl.novaCd = Math.max(0, pl.novaCd - dt);
   pl.infernoCd = Math.max(0, pl.infernoCd - dt);
+  pl.meltCd = Math.max(0, pl.meltCd - dt);
   pl.dashCd = Math.max(0, pl.dashCd - dt);
   pl.dropTimer = Math.max(0, pl.dropTimer - dt);
   pl.iframes = Math.max(0, pl.iframes - dt);
@@ -1216,6 +1449,12 @@ function updatePlayer(dt){
         }
       }
     }
+  }
+
+  // --- 고급 마법 제2식: R 멸화 (화면 전체 별똥별 대재앙)
+  if(!locked && !pl.infernoOn && !melt && pressed["r"] && skillUsable("meltdown") &&
+     pl.meltCd <= 0 && pl.mp >= SKILL.meltdown.mp && pl.dashTimer <= 0 && pl.fbCharge < 0){
+    castMeltdown();
   }
 }
 
@@ -1481,6 +1720,7 @@ function hitMonster(m, baseDmg, kb, pr){
   if(pr.type === "lance"){ lessonEvent("lanceHit"); trainStat("mag", 0.7, true); }
   if(pr.type === "nova"){ lessonEvent("novaHit"); trainStat("mag", 1.0, true); }
   if(pr.type === "inferno"){ lessonEvent("infernoHit"); trainStat("mag", 0.3, true); }
+  if(pr.type === "meltdown"){ lessonEvent("meltdownHit"); trainStat("mag", 0.4, true); }
   const r = mobRect(m);
   addDmgNumber(r.x + r.w/2, r.y - 6, dmg, crit);
   combo.hit();
@@ -1500,6 +1740,13 @@ function hitMonster(m, baseDmg, kb, pr){
       juice.addHitstop(0.3); juice.addShake(1.0); juice.flash = 0.5;
       spawnParticles(m.x, m.y - 60, { n: 60, col: ["#7a9b5e","#a3e635","#fff","#fbbf24"], sp0: 100, sp1: 520, l0: .4, l1: 1.0, grav: 300 });
       questBanner("실기 시험 합격! — 1학기 수료!", "캠퍼스로 돌아가자 — 중급 교사 이그니아가 기다린다!", "새로운 마법: 플레임 랜스(V), 폭염 노바(S)");
+      saveGame();
+    }
+    if(m.type === "firelord"){
+      m.respawn = Infinity;   // 퀘스트 미니보스 — 재등장 없음
+      juice.addHitstop(0.3); juice.addShake(1.0); juice.flash = Math.max(juice.flash, 0.5);
+      spawnParticles(m.x, m.y - 60, { n: 70, col: ["#ff5030","#ff9d4d","#ffe08a","#fff"], sp0: 120, sp1: 560, l0: .4, l1: 1.0, grav: 260 });
+      questBanner("화염 군주 격파!", "심장에서 『멸화의 불씨』가 굴러나왔다 — E로 회수!", "");
       saveGame();
     }
   }
@@ -1682,8 +1929,17 @@ function updateTitle(dt){
 
 function update(dt){
   if(gameState === "title"){ updateTitle(dt); return; }
-  if(showTrainer){
-    // 스킬 강화 패널: [1~5] 강화, E/Tab/Esc 닫기
+  if(learnUI){
+    // 수업 선택 창: ↑/↓ 이동, E/Enter/Space 확정, 클릭, Esc/Tab 닫기
+    if(pressed["Escape"] || pressed["Tab"]){ learnUI = null; pressed["e"] = pressed["Tab"] = false; }
+    else{
+      if(pressed["ArrowUp"]) learnMove(-1);
+      if(pressed["ArrowDown"]) learnMove(1);
+      if(mouse.clicked){ learnClick(mouse.x, mouse.y); mouse.clicked = false; }
+      if(pressed["e"] || pressed["space"] || pressed["Enter"]){ learnConfirm(); pressed["e"] = pressed["space"] = pressed["Enter"] = false; }
+    }
+  }else if(showTrainer){
+    // 스킬 강화 패널: [1~7] 강화, E/Tab/Esc 닫기
     if(pressed["e"] || pressed["Tab"] || pressed["Escape"]){
       showTrainer = false;
       pressed["e"] = pressed["Tab"] = pressed["Escape"] = false;   // 같은 프레임 재상호작용 방지
@@ -1714,7 +1970,7 @@ function update(dt){
   // --- 대화 / 포탈 / 교사 상호작용
   if(dialog){
     if(pressed["e"] || pressed["z"] || pressed["space"]) advanceDialog();
-  }else if(!showBook && !showTrainer && !showWorldMap && !transition && !player.dead){
+  }else if(!showBook && !showTrainer && !showWorldMap && !learnUI && !transition && !player.dead){
     let used = false;
     if(player.onGround && (pressed["ArrowUp"] || pressed["e"])){
       for(const p of portals){
@@ -1739,6 +1995,8 @@ function update(dt){
         inspectBanned();
       }else if(curMapId === "basement" && questState.idx === QI_TOME && Math.abs(player.x - 3100) < 55){
         pickupTome();
+      }else if(curMapId === "firevil" && questState.idx === QI_M2_EMBER && Math.abs(player.x - 2700) < 60){
+        pickupEmber();
       }
     }
   }
@@ -1747,6 +2005,11 @@ function update(dt){
   if(curMapId === "basement" && !transition && Math.random() < 0.5){
     spawnParticles(camX + rand(-20, VIEW_W + 20), rand(90, GROUND_Y - 20),
       { n: 1, col: ["#4a5d4a","#3a4a5a","#2f3b30"], sp0: 1, sp1: 8, l0: 1.6, l1: 3.4, grav: 6, drag: 0.995, r0: 1, r1: 2 });
+  }
+  // 불의 마을 분위기: 피어오르는 잉걸불
+  if(mapTheme === "volcano" && !transition && Math.random() < 0.6){
+    spawnParticles(camX + rand(-20, VIEW_W + 20), GROUND_Y - rand(0, 30),
+      { n: 1, col: ["#ff7b3a","#ffb35c","#ff5030"], sp0: 6, sp1: 30, ang: -Math.PI/2, spread: .5, l0: 1.2, l1: 3.0, grav: -22, drag: 0.994, r0: 1, r1: 3, add: true });
   }
 
   // --- 자동 저장 / 초기화(F2 두 번)
@@ -1771,6 +2034,7 @@ function update(dt){
   updateEprojs(dt);
   updateProjectiles(dt);
   updateFields(dt);
+  updateMeltdown(dt);
   updateParticles(dt);
   combo.update(dt);
   for(let i=explosions.length-1;i>=0;i--){
@@ -1833,6 +2097,8 @@ function render(){
     sky.addColorStop(0, "#241a33"); sky.addColorStop(0.55, "#3e2c45"); sky.addColorStop(1, "#5a3f47");
   }else if(mapTheme === "harbor"){
     sky.addColorStop(0, "#1a2540"); sky.addColorStop(0.5, "#2b3f63"); sky.addColorStop(1, "#4a5f7d");
+  }else if(mapTheme === "volcano"){
+    sky.addColorStop(0, "#2a0f10"); sky.addColorStop(0.5, "#4a1512"); sky.addColorStop(1, "#7a2410");
   }else{
     sky.addColorStop(0, "#141a33"); sky.addColorStop(0.6, "#23294d"); sky.addColorStop(1, "#31294a");
   }
@@ -1843,7 +2109,7 @@ function render(){
   if(mapTheme === "harbor"){
     ctx.fillStyle = "#ffe9b0";
     ctx.beginPath(); ctx.arc(980 - camX*0.05, 130, 44, 0, Math.PI*2); ctx.fill();
-  }else if(mapTheme !== "basement" && mapTheme !== "school"){
+  }else if(mapTheme !== "basement" && mapTheme !== "school" && mapTheme !== "volcano"){
     ctx.fillStyle = "#e9e6ff";
     ctx.beginPath(); ctx.arc(1080 - camX*0.05, 110, 38, 0, Math.PI*2); ctx.fill();
     ctx.fillStyle = mapTheme === "campus" ? "#1a1533" : mapTheme === "town" ? "#241a33" : "#141a33";
@@ -1918,6 +2184,7 @@ function render(){
     town:     { base:"#4a3d33", top:"#6b5a45" },
     harbor:   { base:"#5a4130", top:"#7a5738" },
     forest:   { base:"#2d3b2d", top:"#4a6741" },
+    volcano:  { base:"#2e1712", top:"#5a2418" },
   };
   for(const pf of platforms){
     const g = GT[mapTheme] || GT.forest;
@@ -2099,6 +2366,9 @@ function render(){
   // --- 도서관: 금서 구역 서가
   if(curMapId === "library") drawBannedShelf();
 
+  // --- 불의 마을: 『멸화의 불씨』 회수 지점
+  if(curMapId === "firevil" && questState.idx === QI_M2_EMBER) drawEmberPickup();
+
   // --- 화염 장판
   for(const f of fields){
     const fdur = f.dur ?? SKILL.field.dur;
@@ -2199,6 +2469,57 @@ function render(){
       ctx.fillStyle = m.hurtFlash > 0 ? "#000" : "#ff5a5a";
       ctx.fillRect(m.x - 4, m.y - 11, 2, 3);
       ctx.fillRect(m.x + 2, m.y - 11, 2, 3);
+    }else if(m.type === "ember"){
+      const cy = m.y - d.h/2, fl = Math.sin(m.animT * 10) * 3;
+      ctx.save(); ctx.globalCompositeOperation = "lighter";
+      const g = ctx.createRadialGradient(m.x, cy, 2, m.x, cy, 26);
+      g.addColorStop(0, m.hurtFlash > 0 ? "rgba(255,255,255,.95)" : "rgba(255,220,150,.9)");
+      g.addColorStop(0.5, "rgba(255,120,40,.5)"); g.addColorStop(1, "rgba(255,60,20,0)");
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(m.x, cy, 26, 0, Math.PI*2); ctx.fill();
+      ctx.restore();
+      ctx.fillStyle = m.hurtFlash > 0 ? "#fff" : "#ffd27f";
+      ctx.beginPath();
+      ctx.moveTo(m.x, cy - 16 - fl); ctx.lineTo(m.x + 9, cy + 8); ctx.lineTo(m.x - 9, cy + 8);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "#3a1206";
+      ctx.fillRect(m.x - 5 + m.dir*2, cy - 2, 3, 4);
+      ctx.fillRect(m.x + 2 + m.dir*2, cy - 2, 3, 4);
+    }else if(m.type === "firelord"){
+      const flash = m.hurtFlash > 0;
+      const sway = Math.sin(m.animT * 2) * 3;
+      // 후광
+      ctx.save(); ctx.globalCompositeOperation = "lighter";
+      const g = ctx.createRadialGradient(m.x, m.y - d.h/2, 8, m.x, m.y - d.h/2, 90);
+      g.addColorStop(0, "rgba(255,120,40,.6)"); g.addColorStop(1, "rgba(255,50,20,0)");
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(m.x, m.y - d.h/2, 90, 0, Math.PI*2); ctx.fill();
+      ctx.restore();
+      // 몸통(용암 갑주)
+      ctx.fillStyle = flash ? "#fff" : "#3a140c";
+      ctx.fillRect(m.x - 32, m.y - d.h + 30, 64, d.h - 30);
+      ctx.fillStyle = flash ? "#fff" : "#5a1e10";
+      ctx.fillRect(m.x - 32 - 16, m.y - d.h + 50 + sway, 20, 58);
+      ctx.fillRect(m.x + 32 - 4,  m.y - d.h + 50 - sway, 20, 58);
+      // 용암 균열
+      ctx.save(); if(!flash) ctx.globalCompositeOperation = "lighter";
+      ctx.strokeStyle = flash ? "#fff" : "#ff7b3a"; ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(m.x - 18, m.y - d.h + 44); ctx.lineTo(m.x - 4, m.y - d.h + 74); ctx.lineTo(m.x - 14, m.y - 40);
+      ctx.moveTo(m.x + 16, m.y - d.h + 50); ctx.lineTo(m.x + 4, m.y - d.h + 84);
+      ctx.stroke();
+      ctx.restore();
+      // 머리(뿔 투구)
+      ctx.fillStyle = flash ? "#fff" : "#4a1810";
+      ctx.beginPath(); ctx.ellipse(m.x, m.y - d.h + 16, 30, 24, 0, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(m.x - 24, m.y - d.h + 6); ctx.lineTo(m.x - 40, m.y - d.h - 22); ctx.lineTo(m.x - 12, m.y - d.h - 2);
+      ctx.moveTo(m.x + 24, m.y - d.h + 6); ctx.lineTo(m.x + 40, m.y - d.h - 22); ctx.lineTo(m.x + 12, m.y - d.h - 2);
+      ctx.fill();
+      // 눈
+      ctx.save(); ctx.globalCompositeOperation = "lighter";
+      ctx.fillStyle = flash ? "#fff" : "#ffd93d";
+      ctx.fillRect(m.x - 15 + m.dir*3, m.y - d.h + 12, 9, 7);
+      ctx.fillRect(m.x + 6 + m.dir*3,  m.y - d.h + 12, 9, 7);
+      ctx.restore();
     }else{
       ctx.fillStyle = m.hurtFlash > 0 ? "#fff" : "#e8d8b0";
       ctx.fillRect(r.x + 6, r.y + 14, d.w - 12, d.h - 14);
@@ -2222,6 +2543,9 @@ function render(){
   // --- 플레이어
   drawPlayer();
   if(gameState !== "title" && player.infernoOn) drawInfernoBeam();
+
+  // --- 멸화 운석 (월드 좌표)
+  if(meteors.length) drawMeteors();
 
   // --- 투사체
   for(const pr of projectiles){
@@ -2315,6 +2639,16 @@ function render(){
     ctx.fillStyle = `rgba(255,240,200,${juice.flash})`;
     ctx.fillRect(0, 0, VIEW_W, VIEW_H);
   }
+  // 멸화: 하늘이 붉게 갈라지는 오버레이
+  if(meltFlash > 0){
+    const tier = skillTier("meltdown");
+    ctx.fillStyle = tier === 2 ? `rgba(120,180,255,${meltFlash * 0.28})` : `rgba(255,70,30,${meltFlash * 0.3})`;
+    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    const vg = ctx.createRadialGradient(VIEW_W/2, VIEW_H*0.4, 120, VIEW_W/2, VIEW_H*0.4, VIEW_W*0.7);
+    vg.addColorStop(0, "rgba(0,0,0,0)");
+    vg.addColorStop(1, tier === 2 ? `rgba(20,40,90,${meltFlash*0.5})` : `rgba(90,15,10,${meltFlash*0.5})`);
+    ctx.fillStyle = vg; ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+  }
   if(player.hurtFlash > 0){
     ctx.fillStyle = `rgba(220,40,40,${player.hurtFlash * 0.5})`;
     ctx.fillRect(0, 0, VIEW_W, VIEW_H);
@@ -2394,7 +2728,7 @@ function renderTitle(){
 
   ctx.font = "12px sans-serif"; ctx.fillStyle = "rgba(148,163,184,.6)";
   ctx.fillText("Enter / Space / 클릭으로 시작", VIEW_W/2, 612);
-  ctx.fillText("프로토타입 v0.12 — 아르카나 아카데미", VIEW_W/2, VIEW_H - 20);
+  ctx.fillText("프로토타입 v0.13 — 아르카나 아카데미", VIEW_W/2, VIEW_H - 20);
   ctx.restore();
 
   if(showOptions) renderOptions();
@@ -2518,11 +2852,12 @@ const WORLD_NODES = [
   { id:"forest",   name:"입문의 숲",     x: 665, y: 160, col:"#5fd068", tag:"사냥터 · 시험장" },
   { id:"road1",    name:"학교 뒷숲",     x: 665, y: 340, col:"#5fd068" },
   { id:"village",  name:"여명 마을",     x: 800, y: 340, col:"#f0abfc" },
-  { id:"harbor",   name:"소금바람 항구", x: 800, y: 445, col:"#7dd3fc", tag:"출항 준비 중…" },
+  { id:"harbor",   name:"소금바람 항구", x: 800, y: 445, col:"#7dd3fc", tag:"불의 마을 항로" },
+  { id:"firevil",  name:"불의 마을",     x: 610, y: 470, col:"#ff5030", tag:"화산 · 화염 군주" },
 ];
 const WORLD_EDGES = [
   ["basement","school"], ["school","campus"], ["campus","forest"],
-  ["campus","road1"], ["road1","village"], ["village","harbor"],
+  ["campus","road1"], ["road1","village"], ["village","harbor"], ["harbor","firevil"],
 ];
 function worldNodeOf(mapId){
   return WORLD_NODES.find(n => n.id === mapId || (n.rooms && n.rooms.includes(mapId)));
@@ -2698,6 +3033,49 @@ function drawWorldBackdrop(){
       ctx.fillStyle = "#22384f";
       ctx.beginPath(); ctx.moveTo(sx + 4, seaTop - 36); ctx.lineTo(sx + 54, seaTop + 8); ctx.lineTo(sx + 4, seaTop + 8); ctx.closePath(); ctx.fill();
     }
+  }else if(mapTheme === "volcano"){
+    // 뒤쪽 화산 실루엣 + 정상 용암 불빛
+    for(const v of [{x:1300, h:360, w:520}, {x:2500, h:440, w:620}]){
+      if(v.x < vx0 - 400 || v.x > vx1 + 400) continue;
+      const par = 0.5, vxp = v.x - camX * (par - 1);   // (그려질 좌표는 이미 -camX 적용된 컨텍스트)
+      ctx.fillStyle = "#3a1712";
+      ctx.beginPath();
+      ctx.moveTo(v.x - v.w/2, GROUND_Y);
+      ctx.lineTo(v.x - v.w*0.13, GROUND_Y - v.h);
+      ctx.lineTo(v.x + v.w*0.13, GROUND_Y - v.h);
+      ctx.lineTo(v.x + v.w/2, GROUND_Y);
+      ctx.closePath(); ctx.fill();
+      // 분화구 용암 광
+      ctx.save(); ctx.globalCompositeOperation = "lighter";
+      const g = ctx.createRadialGradient(v.x, GROUND_Y - v.h, 4, v.x, GROUND_Y - v.h, 90);
+      g.addColorStop(0, "rgba(255,140,40,.8)"); g.addColorStop(1, "rgba(255,60,20,0)");
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(v.x, GROUND_Y - v.h, 90, 0, Math.PI*2); ctx.fill();
+      ctx.restore();
+      // 흘러내리는 용암 줄기
+      ctx.strokeStyle = "rgba(255,90,30,.5)"; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.moveTo(v.x, GROUND_Y - v.h);
+      ctx.lineTo(v.x - v.w*0.16, GROUND_Y - v.h*0.4); ctx.lineTo(v.x - v.w*0.05, GROUND_Y); ctx.stroke();
+    }
+    // 지면 용암 균열 빛
+    ctx.save(); ctx.globalCompositeOperation = "lighter";
+    for(let lx = Math.floor(vx0/220)*220; lx < vx1 + 220; lx += 220){
+      const gx = lx + ((lx*53) % 120);
+      ctx.fillStyle = "rgba(255,90,30,.22)";
+      ctx.beginPath(); ctx.ellipse(gx, GROUND_Y + 4, 60, 8, 0, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+    // 정박한 배 (돌아가는 항로)
+    const bx = 150;
+    if(bx > vx0 - 200 && bx < vx1 + 200){
+      ctx.fillStyle = "#3a2418";
+      ctx.beginPath();
+      ctx.moveTo(bx - 70, GROUND_Y - 20); ctx.lineTo(bx + 70, GROUND_Y - 20);
+      ctx.lineTo(bx + 46, GROUND_Y + 14); ctx.lineTo(bx - 46, GROUND_Y + 14);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "#5a3a24"; ctx.fillRect(bx - 3, GROUND_Y - 92, 6, 74);
+      ctx.fillStyle = "#c9a15a";
+      ctx.beginPath(); ctx.moveTo(bx + 4, GROUND_Y - 88); ctx.lineTo(bx + 50, GROUND_Y - 30); ctx.lineTo(bx + 4, GROUND_Y - 30); ctx.closePath(); ctx.fill();
+    }
   }
 }
 
@@ -2800,6 +3178,52 @@ function drawTome(){
     roundRect(x - 42, y - 60, 84, 22, 6); ctx.fill();
     ctx.fillStyle = "#8be9fd"; ctx.font = "bold 13px sans-serif";
     ctx.fillText("E 회수", x, y - 44);
+  }
+}
+
+// 멸화 운석 (월드 좌표) — 낙하 스트릭 + 화염 머리
+function drawMeteors(){
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  for(const mt of meteors){
+    const core = mt.tier === 2 ? "#eaf6ff" : "#fff7dd";
+    const mid  = mt.tier === 2 ? "#7cc4ff" : "#ff8030";
+    const ang = Math.atan2(mt.vy, mt.vx);
+    const tl = 46 + mt.r * 2;
+    const tx = mt.x - Math.cos(ang) * tl, ty = mt.y - Math.sin(ang) * tl;
+    ctx.strokeStyle = mid; ctx.lineCap = "round"; ctx.globalAlpha = 0.85;
+    ctx.lineWidth = mt.r * 1.4;
+    ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(mt.x, mt.y); ctx.stroke();
+    ctx.strokeStyle = core; ctx.globalAlpha = 1; ctx.lineWidth = mt.r * 0.6;
+    ctx.beginPath(); ctx.moveTo(tx + (mt.x-tx)*0.4, ty + (mt.y-ty)*0.4); ctx.lineTo(mt.x, mt.y); ctx.stroke();
+    const g = ctx.createRadialGradient(mt.x, mt.y, 1, mt.x, mt.y, mt.r * 2);
+    g.addColorStop(0, core); g.addColorStop(0.4, mid); g.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(mt.x, mt.y, mt.r * 2, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.restore();
+}
+
+// 『멸화의 불씨』 회수 지점 (화염 군주 격파 후)
+function drawEmberPickup(){
+  const x = 2700, y = GROUND_Y - 30 + Math.sin(performance.now()/380) * 6;
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  const g = ctx.createRadialGradient(x, y, 3, x, y, 54);
+  g.addColorStop(0, "rgba(255,180,80,.95)"); g.addColorStop(0.5, "rgba(255,90,30,.5)"); g.addColorStop(1, "rgba(255,50,20,0)");
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 54, 0, Math.PI*2); ctx.fill();
+  ctx.restore();
+  ctx.fillStyle = "#ff5030"; ctx.beginPath(); ctx.arc(x, y, 11, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = "#ffd27f"; ctx.beginPath(); ctx.arc(x - 3, y - 3, 4, 0, Math.PI*2); ctx.fill();
+  if(Math.random() < 0.3)
+    spawnParticles(x, y, { n: 1, col: ["#ff7b3a","#ffe08a"], sp0: 10, sp1: 60, l0: .3, l1: .8, add: true, grav: -70, r0: 1, r1: 3 });
+  ctx.textAlign = "center";
+  ctx.font = "bold 12px sans-serif"; ctx.fillStyle = "#ffb060";
+  ctx.fillText("『멸화의 불씨』", x, y - 30);
+  if(!dialog && !transition && !player.dead && Math.abs(player.x - x) < 60){
+    ctx.fillStyle = "rgba(10,12,24,.8)";
+    roundRect(x - 42, y - 62, 84, 22, 6); ctx.fill();
+    ctx.fillStyle = "#8be9fd"; ctx.font = "bold 13px sans-serif";
+    ctx.fillText("E 회수", x, y - 46);
   }
 }
 
@@ -3195,15 +3619,16 @@ function renderHUD(){
   // 미니맵 (우상단 — 맵 이름 포함)
   renderMinimap();
 
-  // 핫바 (Z X C V S Shift)
-  const hotbarX = VIEW_W/2 - 220, hotbarY = VIEW_H - 74;
+  // 핫바 (Z X C V S Q R Shift)
+  const hotbarX = VIEW_W/2 - 252, hotbarY = VIEW_H - 74;
   drawSkillSlot(hotbarX,       hotbarY, "Z", "불티",     pl.boltCd / SKILL.bolt.cd, true, !skillUsable("bolt"));
   drawSkillSlot(hotbarX + 64,  hotbarY, "X", "화염구",   pl.fbCd / SKILL.fireball.cdAfter, pl.mp >= SKILL.fireball.mp, !skillUsable("fireball"));
   drawSkillSlot(hotbarX + 128, hotbarY, "C", "화염장판", pl.fieldCd / SKILL.field.cd, pl.mp >= SKILL.field.mp, !skillUsable("field"));
   drawSkillSlot(hotbarX + 192, hotbarY, "V", "랜스",     pl.lanceCd / SKILL.lance.cd, pl.mp >= SKILL.lance.mp, !skillUsable("lance"));
   drawSkillSlot(hotbarX + 256, hotbarY, "S", "노바",     pl.novaCd / SKILL.nova.cd, pl.mp >= SKILL.nova.mp, !skillUsable("nova"));
   drawSkillSlot(hotbarX + 320, hotbarY, "Q", "인페르노", pl.infernoCd / SKILL.inferno.cd, pl.mp >= SKILL.inferno.mpStart, !skillUsable("inferno"));
-  drawSkillSlot(hotbarX + 384, hotbarY, "Shift", "대시", pl.dashCd / P.dashCd, true, false);
+  drawSkillSlot(hotbarX + 384, hotbarY, "R", "멸화",     pl.meltCd / SKILL.meltdown.cd, pl.mp >= SKILL.meltdown.mp, !skillUsable("meltdown"));
+  drawSkillSlot(hotbarX + 448, hotbarY, "Shift", "대시", pl.dashCd / P.dashCd, true, false);
 
   // 보스 HP 바
   if(boss.active && BOSS_M && !BOSS_M.dead){
@@ -3221,6 +3646,26 @@ function renderHUD(){
     ctx.fillRect(bx, by, bw * clamp(BOSS_M.hp / BOSS_M.maxHp, 0, 1), 14);
     ctx.fillStyle = "rgba(255,255,255,.7)";
     ctx.fillRect(bx + bw/2 - 1, by - 3, 2, 20);
+  }
+
+  // 화염 군주(미니보스) HP 바
+  if(curMapId === "firevil"){
+    const fl = monsters.find(m => m.type === "firelord" && !m.dead);
+    if(fl && Math.abs(player.x - fl.x) < 900){
+      const bw = 540, bx = VIEW_W/2 - bw/2, by = 34;
+      ctx.textAlign = "center";
+      ctx.font = "bold 15px sans-serif";
+      ctx.lineWidth = 4; ctx.strokeStyle = "rgba(0,0,0,.7)";
+      ctx.strokeText(MOB_DEFS.firelord.name, VIEW_W/2, by - 8);
+      ctx.fillStyle = "#ffb35c";
+      ctx.fillText(MOB_DEFS.firelord.name, VIEW_W/2, by - 8);
+      ctx.fillStyle = "rgba(0,0,0,.65)";
+      ctx.fillRect(bx - 3, by - 3, bw + 6, 20);
+      ctx.fillStyle = "#ff5030";
+      ctx.fillRect(bx, by, bw * clamp(fl.hp / fl.maxHp, 0, 1), 14);
+      ctx.fillStyle = "rgba(255,255,255,.7)";
+      ctx.fillRect(bx + bw/2 - 1, by - 3, 2, 20);
+    }
   }
 
   // 퀘스트 트래커
@@ -3316,19 +3761,20 @@ function renderHUD(){
   if(showHelp){
     ctx.textAlign = "left";
     ctx.fillStyle = "rgba(10,12,24,.72)";
-    roundRect(16, VIEW_H - 213, 354, 193, 10); ctx.fill();
+    roundRect(16, VIEW_H - 234, 366, 214, 10); ctx.fill();
     ctx.font = "bold 13px sans-serif"; ctx.fillStyle = "#8be9fd";
-    ctx.fillText("조작법 (H: 접기/펼치기)", 30, VIEW_H - 189);
+    ctx.fillText("조작법 (H: 접기/펼치기)", 30, VIEW_H - 210);
     ctx.font = "13px sans-serif"; ctx.fillStyle = "#cbd5e1";
     const lines = [
       "← → 이동  /  Space 점프  /  ↓+Space 아래 블럭으로",
-      "Shift 대시(무적)  /  E 대화  /  ↑ 포탈 이동",
+      "Shift 대시(무적)  /  E 대화 · 수업  /  ↑ 포탈 이동",
       "Z 불티  /  X 홀드 화염구  /  C 화염 장판",
-      "V 랜스  /  S 노바  /  Q(홀드) 인페르노 번 — 고급",
-      "※ 모든 마법은 교수님 수업으로 배워야 사용 가능!",
+      "V 랜스  /  S 노바  /  Q(홀드) 인페르노 — 고급 1식",
+      "R 멸화 — 고급 2식 (화면 전체 광역)",
+      "※ 마법은 교수님 수업(E)에서 골라 배워야 사용 가능!",
       "Tab 학생 수첩  /  M 월드맵  /  자동 저장(F2×2 초기화)",
     ];
-    lines.forEach((l, i)=> ctx.fillText(l, 30, VIEW_H - 165 + i*21));
+    lines.forEach((l, i)=> ctx.fillText(l, 30, VIEW_H - 186 + i*21));
   }else{
     ctx.font = "12px sans-serif"; ctx.fillStyle = "rgba(203,213,225,.5)";
     ctx.fillText("H: 조작법", 20, VIEW_H - 16);
@@ -3337,6 +3783,7 @@ function renderHUD(){
   if(showBook) renderBook();
   if(showTrainer) renderTrainer();
   if(showWorldMap) renderWorldMap();
+  if(learnUI) renderLearn();
 
   // 대화창
   if(dialog){
@@ -3367,7 +3814,7 @@ function renderHUD(){
 
   ctx.textAlign = "right";
   ctx.font = "11px sans-serif"; ctx.fillStyle = "rgba(148,163,184,.55)";
-  ctx.fillText("아르카나 아카데미 프로토타입 v0.12 — 실내 훈련실", VIEW_W - 14, 22);
+  ctx.fillText("아르카나 아카데미 프로토타입 v0.13 — 수업 선택 · 멸화", VIEW_W - 14, 22);
   if(saveFlash > 0){
     ctx.globalAlpha = Math.min(1, saveFlash);
     ctx.font = "12px sans-serif"; ctx.fillStyle = "#4ade80";
@@ -3482,7 +3929,7 @@ function renderBook(){
 }
 
 // 스킬 아이콘 색 (핫바와 통일)
-const SKILL_ICON_COL = { bolt:"#ffb35c", fireball:"#ff6b3a", field:"#ff8c3a", lance:"#ffd23e", nova:"#ff5040" };
+const SKILL_ICON_COL = { bolt:"#ffb35c", fireball:"#ff6b3a", field:"#ff8c3a", lance:"#ffd23e", nova:"#ff5040", inferno:"#ff7b3a", meltdown:"#ff5030" };
 
 // 스킬별 상세 스탯 텍스트 (현재 레벨 기준)
 function skillStatText(k){
@@ -3492,6 +3939,7 @@ function skillStatText(k){
   if(k === "field")    return `틱당 ${d} · MP 20 · 지속 ${(4 + 0.4*(lv-1)).toFixed(1)}s · 폭 ${150 + 26*(lv-1)}`;
   if(k === "lance")    return `데미지 ${d} · 관통 · MP 12 · 사거리 ${720 + 50*(lv-1)}`;
   if(k === "nova")     return `데미지 ${d} · MP 30 · 반경 ${150 + 20*(lv-1)} · 시전 무적 0.4s`;
+  if(k === "meltdown") return `운석당 ${d} · MP 65 · 쿨 24s · 지속 ${(2.6 + 0.25*(lv-1)).toFixed(1)}s · 화면 전체 광역 (고급 제2식)`;
   return `틱당 ${d} ×최대 ${(1 + 2.6).toFixed(1)}배 · MP 10+13/s · 사거리 760 · 단일 광선 (고급)`;
 }
 
@@ -3517,13 +3965,13 @@ function renderCodex(px2, py, PW, PH){
     const S = SKILL[k];
     const learned = player.skills[k];
     const lv = getSkillLv(k), tier = skillTier(k);
-    const ry = py + 96 + i * 72;
+    const ry = py + 92 + i * 64;
     // 행 배경
     ctx.fillStyle = learned ? "rgba(255,180,80,.05)" : "rgba(0,0,0,.25)";
-    roundRect(px2 + 24, ry - 8, PW - 48, 64, 8); ctx.fill();
+    roundRect(px2 + 24, ry - 8, PW - 48, 58, 8); ctx.fill();
     if(learned && tier === 2){
       ctx.strokeStyle = "rgba(124,196,255,.5)"; ctx.lineWidth = 1.5;
-      roundRect(px2 + 24, ry - 8, PW - 48, 64, 8); ctx.stroke();
+      roundRect(px2 + 24, ry - 8, PW - 48, 58, 8); ctx.stroke();
     }
     // 아이콘
     ctx.fillStyle = learned ? (tier === 2 ? "#7cc4ff" : SKILL_ICON_COL[k]) : "#3a4155";
@@ -3558,9 +4006,97 @@ function renderCodex(px2, py, PW, PH){
   });
 }
 
+// ============================== 수업 선택 창 (학생 수첩식) ==============================
+const LEARN_GEO = { PW: 720, PH: 500 };
+function learnPanel(){
+  const { PW, PH } = LEARN_GEO;
+  return { PW, PH, px: (VIEW_W - PW)/2, py: (VIEW_H - PH)/2 };
+}
+function learnRowRect(i){
+  const { PW, px, py } = learnPanel();
+  return { x: px + 24, y: py + 92 + i * 84, w: PW - 48, h: 74 };
+}
+function learnClick(mx, my){
+  if(!learnUI) return;
+  for(let i = 0; i < learnUI.opts.length; i++){
+    const r = learnRowRect(i);
+    if(mx >= r.x && mx <= r.x + r.w && my >= r.y && my <= r.y + r.h){
+      if(learnUI.sel === i) learnConfirm();
+      else learnUI.sel = i;
+      return;
+    }
+  }
+}
+const LEARN_STATUS = {
+  done:   { label:"이수 완료", col:"#4ade80" },
+  active: { label:"수업 진행 중", col:"#fbbf24" },
+  avail:  { label:"배우기 가능", col:"#8be9fd" },
+  locked: { label:"잠김", col:"#64748b" },
+};
+function renderLearn(){
+  const t = learnUI.t;
+  const { PW, PH, px, py } = learnPanel();
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,.6)"; ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+  // 책 느낌 배경
+  ctx.fillStyle = "rgba(30,22,14,.98)";
+  roundRect(px, py, PW, PH, 14); ctx.fill();
+  ctx.strokeStyle = "#8a6a3a"; ctx.lineWidth = 2;
+  roundRect(px, py, PW, PH, 14); ctx.stroke();
+  // 가운데 제본선
+  ctx.strokeStyle = "rgba(138,106,58,.35)"; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(px + PW/2, py + 60); ctx.lineTo(px + PW/2, py + PH - 20); ctx.stroke();
+
+  ctx.textAlign = "left";
+  ctx.font = "bold 20px sans-serif"; ctx.fillStyle = "#ffd27f";
+  ctx.fillText("수업 — 술식 전수", px + 28, py + 42);
+  ctx.font = "13px sans-serif"; ctx.fillStyle = "#cbd5e1";
+  ctx.fillText(t.name + " · " + t.title, px + 210, py + 42);
+  ctx.textAlign = "right";
+  ctx.font = "12px sans-serif"; ctx.fillStyle = "#94a3b8";
+  ctx.fillText("↑/↓ 선택 · E 배우기 · Esc 닫기", px + PW - 28, py + 42);
+
+  ctx.textAlign = "left";
+  learnUI.opts.forEach((o, i)=>{
+    const ls = t.lessons[o.li];
+    const status = lessonStatus(t, o.li);
+    const S = SKILL[ls.skill];
+    const sel = i === learnUI.sel;
+    const r = learnRowRect(i);
+    const meta = LEARN_STATUS[status];
+    ctx.fillStyle = sel ? "rgba(255,210,127,.12)" : "rgba(0,0,0,.28)";
+    roundRect(r.x, r.y, r.w, r.h, 9); ctx.fill();
+    ctx.strokeStyle = sel ? "#ffd27f" : "rgba(120,90,50,.4)"; ctx.lineWidth = sel ? 2 : 1;
+    roundRect(r.x, r.y, r.w, r.h, 9); ctx.stroke();
+    // 아이콘
+    const iconCol = status === "done" ? (skillTier(ls.skill) === 2 ? "#7cc4ff" : (SKILL_ICON_COL[ls.skill]||"#ff7b3a"))
+                    : status === "locked" ? "#3a4155" : "#ff9d4d";
+    ctx.fillStyle = iconCol;
+    ctx.beginPath(); ctx.arc(r.x + 34, r.y + 30, 17, 0, Math.PI*2); ctx.fill();
+    ctx.textAlign = "center";
+    ctx.font = "bold 13px sans-serif"; ctx.fillStyle = "#1a1206";
+    ctx.fillText(S.key, r.x + 34, r.y + 35);
+    ctx.textAlign = "left";
+    // 이름 + 상태
+    ctx.font = "bold 16px sans-serif";
+    ctx.fillStyle = status === "locked" ? "#64748b" : "#f1f5f9";
+    ctx.fillText(S.name, r.x + 62, r.y + 26);
+    ctx.font = "bold 12px sans-serif"; ctx.fillStyle = meta.col;
+    ctx.fillText("· " + meta.label + (status === "active" ? `  (${teacherState[t.id].prog}/${ls.need})` : ""),
+                 r.x + 62 + ctx.measureText(S.name).width + 14, r.y + 26);
+    // 설명 / 과제 / 잠김 사유
+    ctx.font = "12px sans-serif"; ctx.fillStyle = status === "locked" ? "#4a5568" : "#94a3b8";
+    ctx.fillText(status === "locked" ? (ls.reqText || S.desc) : S.desc, r.x + 62, r.y + 46);
+    ctx.fillStyle = status === "locked" ? "#3f4b63" : "#84cc16";
+    ctx.font = "11px sans-serif";
+    ctx.fillText("과제: " + ls.desc, r.x + 62, r.y + 63);
+  });
+  ctx.restore();
+}
+
 // ============================== 스킬 강화 패널 (훈련 교관) ==============================
 function renderTrainer(){
-  const PW = 740, PH = 540;
+  const PW = 740, PH = 588;
   const px2 = (VIEW_W - PW)/2, py = (VIEW_H - PH)/2;
   ctx.save();
   ctx.fillStyle = "rgba(0,0,0,.55)";
@@ -3574,14 +4110,14 @@ function renderTrainer(){
   ctx.font = "bold 20px sans-serif"; ctx.fillStyle = "#ff9d4d";
   ctx.fillText("훈련 교관 — 스킬 강화", px2 + 28, py + 40);
   ctx.font = "12px sans-serif"; ctx.fillStyle = "#94a3b8";
-  ctx.fillText("숫자 [1~5] 키로 강화  ·  E/Tab 닫기   ※ 지금은 무료 — 추후 수업·스토리 연동", px2 + 28, py + 62);
+  ctx.fillText("숫자 [1~7] 키로 강화  ·  E/Tab 닫기   ※ 지금은 무료 — 추후 수업·스토리 연동", px2 + 28, py + 62);
 
   SKILL_ORDER.forEach((k, i)=>{
     const S = SKILL[k];
     const learned = player.skills[k];
     const lv = getSkillLv(k), tier = skillTier(k);
     const maxed = lv >= MAX_SKILL_LV;
-    const ry = py + 88 + i * 72;
+    const ry = py + 86 + i * 68;
     ctx.fillStyle = learned && !maxed ? "rgba(255,157,77,.08)" : "rgba(0,0,0,.25)";
     roundRect(px2 + 24, ry - 6, PW - 48, 62, 8); ctx.fill();
     // 번호 키
