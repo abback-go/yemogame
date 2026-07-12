@@ -106,11 +106,18 @@ const sign  = v => v<0?-1:1;
 // ============================== INPUT ==============================
 const keys = {};
 const pressed = {};
+let cheatBuf = "";
+const CHEAT_CODE = "yemo";
 addEventListener("keydown", e=>{
   if(["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"," ","Tab"].includes(e.key)) e.preventDefault();
   const k = norm(e.key);
   if(!keys[k]) pressed[k] = true;
   keys[k] = true;
+  // 치트 코드: 최근 입력한 글자를 추적 → 'YEMO' 완성 시 발동
+  if(k.length === 1 && /[a-z]/.test(k)){
+    cheatBuf = (cheatBuf + k).slice(-CHEAT_CODE.length);
+    if(cheatBuf === CHEAT_CODE){ cheatBuf = ""; applyCheat(); }
+  }
 });
 addEventListener("keyup", e=>{ keys[norm(e.key)] = false; });
 function norm(k){
@@ -974,6 +981,28 @@ function completeQuest(){
 }
 function questBanner(title, sub, sub2){
   questState.banner = { title, sub, sub2, t: 0, life: 3.4 };
+}
+
+// ============================== 치트 코드 (테스트용): 'YEMO' ==============================
+function applyCheat(){
+  // 모든 스킬 완전 습득 + 최대 강화
+  for(const k of SKILL_ORDER){ player.skills[k] = true; player.skillLv[k] = MAX_SKILL_LV; }
+  player.hasEmber = true;
+  boss.defeated = true;
+  // 진행 중이던 임시 수업 정리 (전부 습득 상태이므로 learning 해제)
+  for(const id in teacherState){ teacherState[id].learning = null; teacherState[id].prog = 0; }
+  // 모든 퀘스트 클리어
+  questState.idx = QUESTS.length;
+  questState.prog = 0;
+  questState.doneAll = true;
+  // 회복 + 연출
+  player.hp = maxHp(); player.mp = maxMp();
+  if(typeof juice !== "undefined"){ juice.addShake(0.6); juice.addHitstop(0.12); juice.flash = Math.max(juice.flash, 0.5); }
+  if(typeof spawnParticles === "function")
+    spawnParticles(player.x, player.y - P.h/2, { n: 60, col: ["#ffd93d","#7cc4ff","#ff9d4d","#fff"], sp0: 120, sp1: 520, l0: .4, l1: 1.0, add: true, grav: -60 });
+  addFloatText(player.x, player.y - P.h - 40, "CHEAT: YEMO", "#ffd93d");
+  questBanner("치트 발동! — YEMO", "모든 마법 습득(MAX 강화) · 모든 퀘스트 클리어", "테스트 모드");
+  saveGame();
 }
 
 // ============================== 교사 & 수업 (§7.5) ==============================
@@ -4314,7 +4343,7 @@ function renderHUD(){
 
   ctx.textAlign = "right";
   ctx.font = "11px sans-serif"; ctx.fillStyle = "rgba(148,163,184,.55)";
-  ctx.fillText("아르카나 아카데미 프로토타입 v0.15 — 이어진 세계", VIEW_W - 14, 22);
+  ctx.fillText("아르카나 아카데미 프로토타입 v0.15 — 이어진 세계 (치트: YEMO)", VIEW_W - 14, 22);
   if(saveFlash > 0){
     ctx.globalAlpha = Math.min(1, saveFlash);
     ctx.font = "12px sans-serif"; ctx.fillStyle = "#4ade80";
