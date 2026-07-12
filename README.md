@@ -57,7 +57,8 @@
 ## 문서
 
 - **📖 게임 기획서 (웹에서 읽기):** https://abback-go.github.io/yemogame/docs/
-- 원본 마크다운: [`docs/arcane-academy-design.md`](docs/arcane-academy-design.md)
+- **🗺️ 월드 & 모험 개편 기획서 (할로우 나이트 참조):** https://abback-go.github.io/yemogame/docs/world.html
+- 원본 마크다운: [`docs/arcane-academy-design.md`](docs/arcane-academy-design.md) · [`docs/world-adventure-design.md`](docs/world-adventure-design.md)
 
 > 기획서 웹 페이지는 `docs/arcane-academy-design.md`를 변환한 것입니다.
 > 기획서 수정 시 `docs/index.html`도 함께 재생성해 주세요.
