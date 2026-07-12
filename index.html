@@ -2040,6 +2040,37 @@ function updateMeltdown(dt){
 }
 
 // ============================== SAVE (localStorage) ==============================
+// ── 유니티 이식용 데이터 반출 (브라우저 콘솔에서 exportGameData() 실행 → JSON 다운로드) ──
+// index.html은 단일 파일 로컬 실행이라 데이터를 JS에 두되, 이 함수로 언제든 순수 JSON을 뽑아
+// 나중에 유니티(C#)에서 그대로 임포트한다. (함수·런타임 프로퍼티는 JSON.stringify가 제거)
+function exportGameData(){
+  const clean = (o)=> JSON.parse(JSON.stringify(o, (k, v)=> (k === "_a") ? undefined : v));
+  const data = {
+    meta: { title: "Arcane Academy", ver: "0.20", exported: new Date().toISOString(),
+            note: "엔진 독립적 게임 데이터. 유니티 이식 시 이 JSON을 임포트. 로직 함수는 C#로 재구현." },
+    physics: { DT, GRAV, CRIT_MUL, MAX_SKILL_LV, P: clean(P) },
+    stats: { RANKS, RANK_NEED, STAT_DEFS, TRAIN_SIZE },
+    skills: clean(SKILL), skillOrder: SKILL_ORDER,
+    mobs: clean(MOB_DEFS),
+    quests: clean(QUESTS),
+    teachers: clean(TEACHERS),
+    abilities: clean(ABILITIES), charms: clean(CHARMS),
+    maps: clean(MAPS),
+    world: { nodes: WORLD_NODES, edges: WORLD_EDGES },
+  };
+  const json = JSON.stringify(data, null, 2);
+  try{
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "arcane-data.json"; a.click();
+    setTimeout(()=> URL.revokeObjectURL(url), 1000);
+    console.log("[Arcane] 데이터 반출 완료 — arcane-data.json (" + json.length + " bytes)");
+  }catch(e){ console.log(json); }
+  return data;
+}
+if(typeof window !== "undefined") window.exportGameData = exportGameData;
+
 const SAVE_KEY = "arcane_proto_save_v3";
 let saveTimer = 8, saveFlash = 0, resetArm = 0;
 function saveGame(){

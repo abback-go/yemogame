@@ -76,6 +76,7 @@
 - **📖 게임 기획서 (웹에서 읽기):** https://abback-go.github.io/yemogame/docs/
 - **🗺️ 월드 & 모험 개편 기획서 v1.0:** https://abback-go.github.io/yemogame/docs/world.html
 - **🌍 월드 아틀라스 & 대확장 기획서 v2.0 (12존 대륙):** https://abback-go.github.io/yemogame/docs/atlas.html
+- **🧭 개발 전략 & 유니티 이식 스펙:** https://abback-go.github.io/yemogame/docs/strategy.html
 - 원본 마크다운: [`docs/arcane-academy-design.md`](docs/arcane-academy-design.md) · [`docs/world-adventure-design.md`](docs/world-adventure-design.md)
 
 > 기획서 웹 페이지는 `docs/arcane-academy-design.md`를 변환한 것입니다.
@@ -84,3 +85,7 @@
 ## 상태
 
 개발 중인 프로토타입입니다. 그래픽은 코드 생성 도트(플레이스홀더)이며 점진적으로 교체 예정.
+
+> **개발 방향:** 웹으로 디자인을 완성한 뒤 **유니티로 이식·보완하여 스팀 판매**를 목표로 합니다.
+> 데이터는 엔진 독립적으로 유지되며, 브라우저 콘솔에서 `exportGameData()`를 실행하면 전 게임 데이터를 `arcane-data.json`으로 반출해 유니티에서 그대로 임포트할 수 있습니다.
+> 개발 지침은 [`CLAUDE.md`](CLAUDE.md), 전략·이식 스펙은 [`docs/strategy.md`](docs/strategy.md) 참고.
