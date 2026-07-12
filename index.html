@@ -33,11 +33,17 @@ const STAIR_SNAP = 18;   // 계단(대각선 발판) 흡착 허용치
 
 const P = {
   w: 30, h: 46,
-  runSpeed: 340, accel: 2800, friction: 2400, airControl: 0.72,
-  jumpV: -880, dropTime: 0.22,
-  dashSpeed: 760, dashTime: 0.16, dashCd: 0.9,
+  runSpeed: 392, accel: 4200, friction: 3600, airControl: 0.90,
+  jumpV: -910, dropTime: 0.22,
+  dashSpeed: 780, dashTime: 0.16, dashCd: 0.72,
   maxHp: 150, maxMp: 100, mpRegen: 7,
   hurtIframes: 1.0,
+  // 무브먼트 필(v0.16): 코요테·버퍼·가변 점프·낙하 상한
+  coyote: 0.10, jumpBuf: 0.12, jumpCut: 0.42, maxFall: 1560, ledgeSnap: 8,
+  // 이동 술식(v0.16~19)
+  airJumpV: -820, wallSlideMax: 240, wallJumpVX: 430, wallJumpVY: -860,
+  meteorSpeed: 1500, meteorTime: 0.34, meteorCd: 1.1,
+  glideFall: 190, blinkDist: 210, blinkCd: 0.9,
 };
 
 const SKILL = {
@@ -91,6 +97,15 @@ const MOB_DEFS = {
   bat:      { name:"그림자 박쥐", hp: 26, w: 24, h: 20, speed: 72, dmg: 9, exp: 10, color:"#2a2438", contact:true, float:true },
   ember:    { name:"화염 정령", hp: 130, w: 30, h: 34, speed: 92, dmg: 18, exp: 45, color:"#ff7b3a", contact:true, float:true },
   firelord: { name:"화염 군주 이그니스", hp: 1050, w: 86, h: 112, speed: 42, dmg: 30, exp: 620, color:"#ff5030", contact:true },
+  // --- v0.16~19 신규 몬스터
+  frostwolf: { name:"서리 늑대", hp: 90, w: 46, h: 32, speed: 130, dmg: 20, exp: 30, color:"#bfe3ff", contact:true },
+  icesprite: { name:"눈보라 정령", hp: 70, w: 28, h: 30, speed: 70, dmg: 16, exp: 26, color:"#dbeafe", contact:true, float:true },
+  cgrub:     { name:"수정 굼벵이", hp: 160, w: 40, h: 30, speed: 40, dmg: 18, exp: 40, color:"#c4b5fd", contact:true },
+  cgiant:    { name:"수정 거인 카브", hp: 1500, w: 100, h: 128, speed: 30, dmg: 34, exp: 800, color:"#a78bfa", contact:true },
+  slaggolem: { name:"슬래그 골렘", hp: 240, w: 54, h: 60, speed: 44, dmg: 24, exp: 60, color:"#7a4a2e", contact:true },
+  gardjelly: { name:"바람 해파리", hp: 80, w: 40, h: 40, speed: 34, dmg: 14, exp: 34, color:"#bbf7d0", contact:true, float:true },
+  ashwraith: { name:"재 망령", hp: 120, w: 30, h: 44, speed: 96, dmg: 22, exp: 48, color:"#9ca3af", contact:true, float:true },
+  mirror:    { name:"수석 졸업생의 그림자", hp: 1400, w: 34, h: 50, speed: 150, dmg: 28, exp: 900, color:"#c084fc", contact:true },
 };
 const RESPAWN_TIME = 5.0;
 
@@ -129,7 +144,11 @@ const inp = {
   right: ()=> keys["ArrowRight"],
   down:  ()=> keys["ArrowDown"],
   jumpP: ()=> pressed["space"] || pressed["ArrowUp"],
+  jumpHeld: ()=> keys["space"] || keys["ArrowUp"],
   dashP: ()=> pressed["Shift"],
+  meteorP: ()=> pressed["g"],
+  wispP: ()=> pressed["f"],
+  blinkP: ()=> pressed["b"],
   boltP: ()=> pressed["z"],
   fbHeld:()=> keys["x"],
   helpP: ()=> pressed["h"],
@@ -188,7 +207,7 @@ function addFloatText(x, y, text, col){
 }
 
 const combo = { count: 0, timer: 0, best: 0,
-  hit(){ this.count++; this.timer = 2.0; this.best = Math.max(this.best, this.count); },
+  hit(){ this.count++; this.timer = 2.0 * (hasCharm("combo") ? 1.6 : 1); this.best = Math.max(this.best, this.count); },
   update(dt){ if(this.timer > 0){ this.timer -= dt; if(this.timer <= 0) this.count = 0; } },
 };
 
@@ -227,7 +246,7 @@ const MAPS = {
       { x: 3200, text: "학생 게시판 — 시계탑 출입 자유화! (단, 떨어져도 책임 안 짐)" },
       { x: 2860, y: 780, text: "지붕 정원 — 바람이 잘 드는 낮잠 명소" },
       { x: 4100, text: "시계탑 — 정상에서 숲 꼭대기로 건너갈 수 있다는 소문이…" },
-      { x: 4380, y: 240, text: "시계탑 정상 — 언덕과 숲, 바다가 한눈에 (고대 기록판: \"탑은 숲을 향해 인사한다\")" },
+      { x: 4380, y: 240, text: "시계탑 정상 · 천문대 — 상승 기류가 하늘로 솟는다 (재의 망토가 있다면…)" },
       { x: 3640, text: "낡은 우물 — 두레박 줄이 어둠 속으로 한없이 이어져 있다" },
       { x: 5900, text: "동쪽 관문 — 깊은 숲" },
     ],
@@ -237,6 +256,7 @@ const MAPS = {
       { x: 2900, y: 1200, to: "clubroom", tx: 820,  ty: 640,  label: "동아리방", door: true, tint: "#a3e635" },
       { x: 3640, y: 1200, to: "basement", tx: 600,  ty: 1340, label: "낡은 우물 ↓ (지하 미궁)", tint: "#4ade80", down: true },
       { x: 4380, y: 240,  to: "forest",   tx: 420,  ty: 520,  label: "숲 꼭대기로 (건너뛰기!)", tint: "#8be9fd" },
+      { x: 4520, y: 240,  to: "garden",   tx: 300,  ty: 3060, label: "천문대 — 상승 기류로 부유 정원", tint: "#bbf7d0", needAbility: "glide" },
       { x: 6100, y: 1200, to: "forest",   tx: 170,  ty: 1500, label: "동쪽 관문 — 깊은 숲" },
     ],
     npcs: [
@@ -433,16 +453,25 @@ const MAPS = {
       { x: 6740, text: "1학기 수료!" },
       { x: 370,  y: 520,  text: "숲 꼭대기 — 서쪽으로 시계탑이 보인다" },
       { x: 3300, y: 420,  text: "고대 기록판: \"바람은 가장 높은 가지에만 머문다\"" },
-      { x: 5500, y: 320,  text: "바람의 사당 — 굳게 봉인되어 있다 (…언젠가 열릴 것 같다)" },
+      { x: 5500, y: 320,  text: "바람의 사당 — 「바람 걸음」의 비석 (E)" },
       { x: 5600, y: 2200, text: "고대 기록판: \"이 숲의 뿌리는 학교보다 오래되었다\"" },
+      { x: 6420, y: 2200, text: "금 간 암벽 — 무언가로 부술 수 있을 것 같다 (유성 질주?)" },
       { x: 6500, y: 2200, text: "심연의 계단 — 위로" },
     ],
     portals: [
       { x: 170,  y: 1500, to: "campus",   tx: 6100, ty: 1200, label: "동쪽 관문 — 아르카나 언덕" },
       { x: 420,  y: 520,  to: "campus",   tx: 4380, ty: 240,  label: "시계탑으로 (건너뛰기!)", tint: "#8be9fd" },
       { x: 4400, y: 2200, to: "basement", tx: 4300, ty: 1340, label: "뿌리 동굴 — 지하 미궁", tint: "#4ade80" },
+      { x: 6600, y: 2200, to: "starmine", tx: 300,  ty: 640,  label: "수정 균열 — 별빛 광산", tint: "#c4b5fd" },
     ],
-    npcs: [],
+    shrines: [ { x: 5500, y: 320, ability: "doubleJump" } ],
+    crackWalls: [ { x: 6440, y: 2040, w: 30, h: 160 } ],
+    npcs: [
+      { kind: "info", name: "지도학자 코넬리", x: 3200, y: 420, lines: [
+        "흐음~♪ 여기 지도를 그리는 중이라네. 코넬리라고 하네.",
+        "이 세계는 넓어. 언덕, 숲, 지하, 바다… 그 너머엔 설산과 하늘 정원도 있다지.",
+        "탐험하다 막다른 길을 만나거든 실망 말게 — 거기엔 늘 뭔가가 있으니까." ] },
+    ],
     mobs: [
       ["slime", 900, 800, 1050, 1500], ["slime", 1300, 1200, 1450, 1500],
       ["mushroom", 1750, 1650, 1900, 1500],
@@ -498,6 +527,8 @@ const MAPS = {
       { x: 200, text: "학교 지하실 — 관계자 외 출입 금지" },
       { x: 2750, text: "주의: 바닥이 무너져 있다 — ↓+Space (아래: 카타콤)" },
       { x: 4600, text: "고대 기록판: \"문이 잠든 곳, 세 갈래 길이 만난다\"" },
+      { x: 3300, y: 1340, text: "벽 사당 — 「도마뱀 발」의 룬 (E)" },
+      { x: 900, y: 1340, text: "그을린 사당 — 「도깨비불」의 불씨 (E)" },
       { x: 600,  y: 1340, text: "우물 밑바닥 — 위에서 희미한 빛이 새어 든다" },
       { x: 1500, y: 1340, text: "고대 기록판: \"우리는 학교가 세워지기 전부터 이 길을 걸었다\"" },
       { x: 2200, y: 1340, text: "카타콤 대계단 — 위로" },
@@ -509,9 +540,12 @@ const MAPS = {
       { x: 600,  y: 1340, to: "campus",  tx: 3640, ty: 1200, label: "우물 위로 ↑ (교정)", tint: "#4ade80" },
       { x: 4000, y: 1340, to: "village", tx: 4800, ty: 1000, label: "마을 우물 ↑ (노을 해안)", tint: "#7dd3fc" },
       { x: 4300, y: 1340, to: "forest",  tx: 4400, ty: 2200, label: "뿌리 동굴 — 깊은 숲 심연", tint: "#5fd068" },
+      { x: 340,  y: 1340, to: "morugol", tx: 200,  ty: 1000, label: "용암 지맥 — 모루골", tint: "#ff8040" },
+      { x: 4600, y: 1340, to: "starmine", tx: 300, ty: 640,  label: "동쪽 갱도 — 별빛 광산", tint: "#c4b5fd" },
     ],
+    shrines: [ { x: 3300, y: 1340, ability: "wallJump" }, { x: 900, y: 1340, ability: "wisp" } ],
     torches: [ 200, 640, 1150, 1650, 2150, 2650, 3080, 3600, 4200 ],
-    door: { x: 3230 },
+    door: { x: 3230, to: "ashstreet", tx: 200, ty: 1000 },
     mobs: [
       ["bat", 1500, 1300, 1720, 380],
       ["bat", 2050, 1880, 2280, 300],
@@ -547,7 +581,7 @@ const MAPS = {
     signs: [
       { x: 200,  text: "소금바람 항구 — 바다 끝엔 무엇이 있을까" },
       { x: 1850, text: "출항 안내: 불의 마을행 — 선원에게 문의" },
-      { x: 420,  y: 560, text: "등대 — 고대 기록판: \"바다 건너의 불은 등불이 아니라 심장이다\"" },
+      { x: 420,  y: 560, text: "등대 뒤 서리 산길 — 북쪽 설산으로 (바람 걸음 필요)" },
       { x: 2600, y: 640, text: "절벽길 — 노을이 가장 잘 보이는 곳" },
       { x: 3300, text: "여명 마을 — 학교 앞 작은 마을" },
       { x: 3500, text: "여관" },
@@ -558,6 +592,7 @@ const MAPS = {
     portals: [
       { x: 4800, y: 1000, to: "basement", tx: 4000, ty: 1340, label: "마을 우물 ↓ (지하 미궁)", tint: "#4ade80", down: true },
       { x: 5540, y: 1000, to: "campus",  tx: 130,  ty: 1200, label: "동쪽 오르막길 — 아르카나 언덕", tint: "#c4b5fd" },
+      { x: 300,  y: 560,  to: "frost",   tx: 200,  ty: 1400, label: "등대 뒤 서리 산길 — 서리고개", tint: "#bfe3ff", needAbility: "doubleJump" },
     ],
     npcs: [
       { kind: "sailor", name: "선원", x: 900 },
@@ -593,9 +628,13 @@ const MAPS = {
       { x: 1000, text: "경고: 화산 정상엔 화염 군주가 잠들어 있다" },
       { x: 2500, text: "분화구 — 화염 군주 이그니스의 둥지" },
       { x: 2650, y: 960, text: "화구 등반로 — 발밑 조심!" },
-      { x: 3250, y: 460, text: "화구 능선 — 이글거리는 흑요암이 길을 막는다 (평범한 불로는 어림도 없다…)" },
+      { x: 3250, y: 460, text: "화구 능선 — 금 간 흑요암 너머 용암 동굴 (유성 질주로 부술 수 있을 듯)" },
     ],
-    portals: [ { x: 150, y: 1200, to: "village", tx: 900, ty: 1000, label: "항구로 (배)", tint: "#7dd3fc", door: true } ],
+    portals: [
+      { x: 150, y: 1200, to: "village", tx: 900, ty: 1000, label: "항구로 (배)", tint: "#7dd3fc", door: true },
+      { x: 3300, y: 460, to: "morugol", tx: 5200, ty: 1000, label: "용암 동굴 — 모루골로", tint: "#ff8040" },
+    ],
+    crackWalls: [ { x: 3260, y: 320, w: 30, h: 150 } ],
     npcs: [
       { kind: "info", name: "화산지기", x: 500, lines: [
         "바다 건너 여기까지 오다니… 대마도사님이 보낸 아이로군.",
@@ -608,6 +647,268 @@ const MAPS = {
       ["ember", 1350, 1200, 1550, 1200], ["ember", 1750, 1600, 1950, 1200], ["ember", 2200, 2050, 2350, 1200],
       ["firelord", 2700, 2700, 2700, 1200],
     ],
+  },
+
+  // ========== Z6. 서리고개 — 온기 게이지 튜토리얼 존 ==========
+  frost: {
+    name: "서리고개 — 눈보라 고갯길", w: 5200, h: 1600, ground: 1400, tall: true, theme: "snow", cold: true,
+    platforms: [
+      { x: 0, y: 1400, w: 5200, h: 60, solidGround: true, base: true },
+      { x: 700,  y: 1280, w: 160, h: 14 },
+      { x: 1100, y: 1180, w: 160, h: 14 },
+      { x: 1500, y: 1090, w: 160, h: 14 },
+      { x: 2100, y: 1200, w: 180, h: 14 },
+      { x: 2700, y: 1120, w: 160, h: 14 },
+      { x: 3300, y: 1220, w: 180, h: 14 },
+      { x: 3900, y: 1120, w: 160, h: 14 },
+      { x: 4500, y: 1240, w: 180, h: 14 },
+    ],
+    signs: [
+      { x: 260,  text: "서리고개 — 온기가 없으면 얼어붙는다. 화로(E)에 불을 붙이며 나아가자!" },
+      { x: 1300, text: "온기 게이지가 바닥나면 체온을 잃는다 — 불티(Z)로 화로를 밝혀라" },
+      { x: 3600, text: "고갯마루 너머 — 얼어붙은 마을의 등불이 보인다" },
+      { x: 2400, text: "고대 기록판: \"첫 불꽃은 추위에서 태어났다\"" },
+    ],
+    braziers: [ { id:"a", x: 500 }, { id:"b", x: 1800 }, { id:"c", x: 2900 }, { id:"d", x: 4100 } ],
+    portals: [
+      { x: 80,   y: 1400, to: "village", tx: 340,  ty: 1000, label: "서리 산길 아래 — 노을 해안", tint: "#7dd3fc" },
+      { x: 5100, y: 1400, to: "icevil",  tx: 200,  ty: 1200, label: "얼음 마을 '겨울바람'", tint: "#dbeafe" },
+    ],
+    npcs: [
+      { kind: "info", name: "조난당한 상인", x: 2350, lines: [
+        "으으, 얼어 죽는 줄… 자네가 화로를 밝혀준 덕에 살았네!",
+        "은혜는 잊지 않겠네. 모루골에서 다시 만나면 싸게 쳐줌세." ] },
+    ],
+    mobs: [
+      ["frostwolf", 1600, 1400, 1900, 1400], ["frostwolf", 3000, 2800, 3300, 1400],
+      ["icesprite", 2200, 2000, 2500, 1150], ["icesprite", 3800, 3600, 4100, 1080],
+    ],
+  },
+
+  // ========== Z7. 얼음 마을 '겨울바람' — 빙판·빙벽·은둔 스승 ==========
+  icevil: {
+    name: "얼음 마을 '겨울바람'", w: 6000, h: 2400, ground: 1200, tall: true, theme: "ice", cold: true,
+    platforms: [
+      { x: 0, y: 1200, w: 6000, h: 60, solidGround: true, base: true, icy: true },
+      { x: 900,  y: 1080, w: 200, h: 14, icy: true },
+      { x: 1400, y: 980,  w: 180, h: 14, icy: true },
+      { x: 2000, y: 1080, w: 200, h: 14, icy: true },
+      // 빙벽 상부 신사 (벽 점프 구간)
+      { x: 3200, y: 900,  w: 140, h: 14 },
+      { x: 3200, y: 640,  w: 140, h: 14 },
+      { x: 3200, y: 380,  w: 220, h: 16 },
+    ],
+    walls: [ { x: 3360, y: 380, w: 26, h: 840 } ],   // 빙벽 (벽 점프로 오름)
+    signs: [
+      { x: 240,  text: "얼음 마을 '겨울바람' — 얼어붙은 호수 위의 등불 마을" },
+      { x: 900,  text: "빙판 주의! 미끄럽다 (대시로 제동)" },
+      { x: 3260, y: 380, text: "빙벽 위 신사 — 하늘 정원으로 (재의 망토가 있다면 활공)" },
+      { x: 2600, text: "고대 기록판: \"불을 아는 자만이 얼음을 이해한다\"" },
+    ],
+    braziers: [ { id:"a", x: 600 }, { id:"b", x: 2400 } ],
+    portals: [
+      { x: 80,   y: 1200, to: "frost",  tx: 5000, ty: 1400, label: "서리고개로", tint: "#bfe3ff" },
+      { x: 3300, y: 380,  to: "garden", tx: 300,  ty: 3060, label: "하늘 정원으로 (활공)", tint: "#bbf7d0", needAbility: "glide" },
+      { x: 5900, y: 1200, to: "starmine", tx: 5600, ty: 640, label: "호수 밑 균열 — 별빛 광산", tint: "#c4b5fd", needAbility: "meteorDash" },
+    ],
+    npcs: [
+      { kind: "heal", name: "온천 여관 주인", x: 1000, lines: [
+        "겨울바람 온천에 온 걸 환영해요. 몸도 마나도 뜨끈하게 데우고 가요." ] },
+      { kind: "ghost", name: "빙설술사 유키네", x: 2200, lines: [
+        "…화염술 학생이 여기까지. 나는 유키네, 폐과된 빙설학의 마지막 교수야.",
+        "불을 다루는 자만이 얼음의 고요를 이해하지.",
+        "언젠가 내 빙설 비전을 나눠줄 날이 오겠지. …그때까지 부디 얼어붙지 말고." ] },
+    ],
+    mobs: [
+      ["icesprite", 1600, 1400, 1900, 1050], ["icesprite", 2400, 2200, 2600, 1200],
+      ["frostwolf", 4200, 4000, 4500, 1200], ["frostwolf", 5000, 4800, 5300, 1200],
+    ],
+  },
+
+  // ========== Z8. 별빛 광산 — 유성 질주 레일·수정 은하 ==========
+  starmine: {
+    name: "별빛 광산 — 지하 은하", w: 7000, h: 2400, ground: 640, tall: true, theme: "mine",
+    platforms: [
+      { x: 0, y: 640, w: 3000, h: 60, solidGround: true },
+      { x: 3000, y: 640, w: 300, h: 60, solidGround: true },
+      { x: 3300, y: 640, w: 3700, h: 60, solidGround: true, base: true },
+      { x: 0, y: 1600, w: 7000, h: 60, solidGround: true, base: true },   // 대공동 바닥
+      { x: 800,  y: 520, w: 160, h: 14 },
+      { x: 1300, y: 440, w: 160, h: 14 },
+      { x: 1800, y: 520, w: 160, h: 14 },
+      { x: 4200, y: 520, w: 180, h: 14 },
+      { x: 4800, y: 440, w: 180, h: 14 },
+      // 대공동 최심부 유성 사당 접근 (벽점프+이중점프)
+      { x: 5600, y: 1480, w: 140, h: 14 },
+      { x: 5600, y: 1240, w: 140, h: 14 },
+      { x: 5600, y: 1000, w: 220, h: 16 },
+    ],
+    walls: [ { x: 5740, y: 1000, w: 24, h: 600 } ],
+    rails: [
+      { x0: 300, y0: 604, x1: 2900, y1: 604 },       // 상층 고속 레일 (바닥 바로 위)
+      { x0: 300, y0: 1564, x1: 6800, y1: 1564 },      // 대공동 횡단 고속 레일
+    ],
+    signs: [
+      { x: 260,  text: "별빛 광산 — 수정이 별처럼 빛나는 대동굴" },
+      { x: 1500, text: "버려진 광산 레일 — 유성 질주로 달릴 수 있을 것 같다" },
+      { x: 5600, y: 1000, text: "유성 사당 — 「유성 질주」의 별빛 (E)" },
+      { x: 3400, text: "고대 기록판: \"제1 아카데미는 이 아래에서 무언가를 캐려 했다\"" },
+    ],
+    shrines: [ { x: 5600, y: 1000, ability: "meteorDash" } ],
+    portals: [
+      { x: 100, y: 640, to: "forest",   tx: 6560, ty: 2200, label: "수정 균열 — 깊은 숲 심연", tint: "#5fd068" },
+      { x: 200, y: 1600, to: "basement", tx: 4560, ty: 1340, label: "서쪽 갱도 — 지하 미궁", tint: "#4ade80" },
+      { x: 5650, y: 640, to: "icevil",  tx: 5800, ty: 1200, label: "호수 밑 균열 — 얼음 마을", tint: "#dbeafe" },
+    ],
+    npcs: [
+      { kind: "info", name: "떠돌이 모험가 핀", x: 2200, lines: [
+        "여기까지 온 사람은 자네가 처음이야! 아, 나 말고. 난 핀, 견습 모험가지.",
+        "이 광산 레일… 유성 질주만 있으면 끝내주게 달릴 수 있을 텐데. 부럽구만!" ] },
+    ],
+    mobs: [
+      ["cgrub", 1000, 900, 1200, 640], ["cgrub", 1600, 1500, 1800, 640],
+      ["bat", 2400, 2200, 2700, 480], ["cgrub", 4400, 4300, 4600, 640],
+      ["cgiant", 6400, 6400, 6400, 1600],
+    ],
+  },
+
+  // ========== Z9. 모루골 — 대장간 마을·각인 공방 ==========
+  morugol: {
+    name: "모루골 — 대장간 마을", w: 5400, h: 1400, ground: 1000, tall: true, theme: "forge",
+    platforms: [
+      { x: 0, y: 1000, w: 5400, h: 60, solidGround: true, base: true },
+      { x: 800,  y: 880, w: 180, h: 14 },
+      { x: 1300, y: 800, w: 160, h: 14 },
+      { x: 3600, y: 880, w: 180, h: 14 },
+      { x: 4200, y: 800, w: 180, h: 14 },
+    ],
+    signs: [
+      { x: 260,  text: "모루골 — 용암이 두드리는 대장간 마을" },
+      { x: 1500, text: "각인 공방 — 마도각인(부적)을 제작·장착 (대장장이 브란에게 E)" },
+      { x: 4600, text: "재의 수로 — 저 아래 옛 도시로 이어진다" },
+      { x: 2800, text: "고대 기록판: \"우리는 제1 아카데미의 무기를 만들었다. 그리고 후회한다.\"" },
+    ],
+    portals: [
+      { x: 80,   y: 1000, to: "basement", tx: 440, ty: 1340, label: "용암 지맥 — 지하 미궁", tint: "#4ade80" },
+      { x: 5200, y: 1000, to: "firevil",  tx: 3250, ty: 460, label: "용암 동굴 — 불의 마을", tint: "#ff8040" },
+      { x: 4700, y: 1000, to: "ashstreet", tx: 6800, ty: 1000, label: "재의 수로 ↓ — 재의 거리", tint: "#9ca3af", down: true },
+    ],
+    npcs: [
+      { kind: "forge", name: "대장장이 브란", x: 1500, lines: [
+        "쿵, 쿵— 오, 손님인가. 나는 브란. 이 마을의 촌장이자 대장장이지.",
+        "마력 결정과 소재를 가져오면 마도각인을 만들어주지. 지팡이도 벼려주고.",
+        "각인은 장착하면 힘이 된다. 뭐부터 만들어 볼까?" ] },
+      { kind: "heal", name: "고철상", x: 3600, lines: [
+        "서리고개에서 날 구해준 그 학생이군! 이리 와, 몸 좀 녹이게." ] },
+    ],
+    mobs: [
+      ["slaggolem", 2400, 2200, 2700, 1000], ["slaggolem", 3400, 3200, 3700, 1000],
+    ],
+  },
+
+  // ========== Z10. 부유 정원 — 상승 기류·활공 ==========
+  garden: {
+    name: "부유 정원 — 하늘에 뜬 옛 정원", w: 4400, h: 3400, ground: 3200, tall: true, theme: "garden",
+    platforms: [
+      { x: 0, y: 3200, w: 900, h: 60, solidGround: true, base: true },
+      // 떠 있는 섬들
+      { x: 300,  y: 3060, w: 200, h: 16 },
+      { x: 700,  y: 2760, w: 180, h: 14 },
+      { x: 1100, y: 2860, w: 180, h: 14 },
+      { x: 1500, y: 2560, w: 180, h: 14 },
+      { x: 1200, y: 2200, w: 200, h: 14 },
+      { x: 1700, y: 1900, w: 200, h: 14 },
+      { x: 2200, y: 2100, w: 180, h: 14 },
+      { x: 2000, y: 1500, w: 200, h: 14 },
+      { x: 2500, y: 1200, w: 200, h: 14 },
+      { x: 3000, y: 900,  w: 220, h: 16 },   // 최고 전망대 (바람의 성소)
+      { x: 3400, y: 1400, w: 200, h: 14 },
+      { x: 3800, y: 1800, w: 200, h: 14 },
+    ],
+    updrafts: [
+      { x: 500,  w: 120, top: 2400 },
+      { x: 1600, w: 120, top: 1400 },
+      { x: 2900, w: 140, top: 800 },
+    ],
+    signs: [
+      { x: 340,  y: 3060, text: "부유 정원 — 바닥이 없는 하늘의 폐허. 낙하해도 언덕 상공으로 떨어질 뿐." },
+      { x: 3080, y: 900,  text: "최고 전망대 · 바람의 성소 — 「재의 망토」의 잿빛 천 (E) / 기록판: \"여기서 보면 세계는 하나의 학교다\"" },
+      { x: 550,  y: 2400, text: "상승 기류 — 올라타면 하늘로 (활공하면 더 멀리)" },
+    ],
+    shrines: [ { x: 3080, y: 900, ability: "glide" } ],
+    portals: [
+      { x: 250, y: 3200, to: "campus", tx: 4520, ty: 240, label: "천문대로 내려가기 — 아르카나 언덕", tint: "#c4b5fd" },
+    ],
+    npcs: [],
+    mobs: [
+      ["gardjelly", 900, 800, 1100, 2760], ["gardjelly", 1600, 1500, 1800, 1900],
+      ["gardjelly", 2300, 2200, 2500, 2100], ["gardjelly", 3500, 3400, 3700, 1400],
+    ],
+  },
+
+  // ========== Z11. 재의 거리 — 유령 서사·재의 장막·거울 보스 ==========
+  ashstreet: {
+    name: "재의 거리 — 재가 내리는 옛 도시", w: 7200, h: 2000, ground: 1000, tall: true, theme: "ash",
+    platforms: [
+      { x: 0, y: 1000, w: 7200, h: 60, solidGround: true, base: true },
+      { x: 900,  y: 880, w: 200, h: 14 },
+      { x: 1400, y: 780, w: 180, h: 14 },
+      { x: 2000, y: 860, w: 200, h: 14 },
+      { x: 3400, y: 800, w: 200, h: 14 },
+      { x: 4000, y: 700, w: 200, h: 14 },
+      { x: 5200, y: 840, w: 200, h: 14 },
+      { x: 5800, y: 740, w: 200, h: 14 },
+    ],
+    veils: [ { x: 2600, w: 260 }, { x: 4600, w: 260 } ],   // 재의 장막 (섬화로 통과)
+    signs: [
+      { x: 260,  text: "재의 거리 — 재가 눈처럼 내린다. 유령들은 아직 자신이 죽은 걸 모른다." },
+      { x: 2500, text: "재의 장막 — 시야를 가린다 (섬화로 통과)" },
+      { x: 3200, text: "제1 아카데미 폐허 — 옛 강의실" },
+      { x: 6900, text: "재의 수로 위로 — 모루골" },
+      { x: 700,  text: "고대 기록판: \"우리는 첫 불꽃을 소유하려 했다. 도시가 그 대가를 치렀다.\"" },
+    ],
+    portals: [
+      { x: 100,  y: 1000, to: "basement",  tx: 3300, ty: 640, label: "의문의 문 — 지하 미궁", tint: "#8b5cf6" },
+      { x: 6900, y: 1000, to: "morugol",   tx: 4700, ty: 1000, label: "재의 수로 ↑ — 모루골", tint: "#ff8040" },
+      { x: 7100, y: 1000, to: "temple",    tx: 200,  ty: 1000, label: "봉인의 문 — 첫 불꽃의 신전", tint: "#ffd93d", needAbility: "blink" },
+    ],
+    npcs: [
+      { kind: "ghost", name: "유령 교장", x: 3200, lines: [
+        "…오늘도 수업에 늦었구나. 아니, 자네는… 살아있군. 이 도시에선 드문 일이지.",
+        "나는 이 도시의 마지막 교장. 자네의 교장은 나의 제자였다.",
+        "세 인장을 모아 신전을 열거라. 그리고… 마지막 술식 「섬화」를 받아라." ] },
+    ],
+    mobs: [
+      ["ashwraith", 1200, 1000, 1500, 1000], ["ashwraith", 2200, 2000, 2500, 1000],
+      ["ashwraith", 5000, 4800, 5300, 1000],
+      ["mirror", 6400, 6400, 6400, 1000],
+    ],
+  },
+
+  // ========== Z12. 첫 불꽃의 신전 — 최종 지역·봉인 회랑 ==========
+  temple: {
+    name: "첫 불꽃의 신전", w: 3600, h: 1400, ground: 1000, tall: true, theme: "temple",
+    platforms: [
+      { x: 0, y: 1000, w: 3600, h: 60, solidGround: true, base: true },
+      { x: 900,  y: 860, w: 200, h: 14 },
+      { x: 1500, y: 780, w: 200, h: 14 },
+      { x: 2100, y: 860, w: 200, h: 14 },
+    ],
+    signs: [
+      { x: 260,  text: "첫 불꽃의 신전 — 재가 내리지 않고, 촛불이 꺼지지 않는 성역" },
+      { x: 1600, text: "봉인 회랑 — 배운 모든 술식으로 화로를 밝혀라" },
+      { x: 3200, text: "첫 불꽃의 제단 — 기록판: \"불꽃은 소유하는 것이 아니라 배우는 것이다\"" },
+    ],
+    braziers: [ { id:"s1", x: 1000 }, { id:"s2", x: 1600 }, { id:"s3", x: 2200 } ],
+    portals: [
+      { x: 80, y: 1000, to: "ashstreet", tx: 7000, ty: 1000, label: "재의 거리로", tint: "#9ca3af" },
+    ],
+    npcs: [
+      { kind: "info", name: "신전 문지기", x: 3200, lines: [
+        "여기까지 온 자여. 첫 불꽃은 아직 잠들어 있다.",
+        "…그 이야기는, 다음에. 지금은 네가 걸어온 길을 돌아보아라." ] },
+    ],
+    mobs: [],
   },
 };
 
@@ -674,6 +975,17 @@ const player = {
   boltCd: 0, fbCharge: -1, fbCd: 0, fieldCd: 0, lanceCd: 0, novaCd: 0,
   infernoOn: false, infernoT: 0, infernoTick: 0, infernoCd: 0, infernoHitX: null,
   meltCd: 0,
+  // --- 무브먼트 필 상태
+  coyoteT: 0, jumpBufT: 0, jumpsUsed: 0, jumpHolding: false,
+  wallDir: 0, wallSlide: false,
+  // --- 이동 술식 상태
+  meteorTimer: 0, meteorCd: 0, meteorDir: 1, onRail: null,
+  wispOn: false, gliding: false, blinkCd: 0,
+  warmth: 1,   // 추운 존(온기 게이지) — 1=따뜻, 0=위험
+  // ★ 이동 술식 습득 여부 (세계에서 사당·스승으로 획득)
+  abilities: { doubleJump: false, wallJump: false, wisp: false, meteorDash: false, glide: false, blink: false },
+  crystals: 0,   // 마력 결정 (재화 — 몬스터·광맥 드랍)
+  charms: { owned: [], equipped: [] },   // 마도각인(부적)
   hasEmber: false,   // 『멸화의 불씨』 획득 여부 (제2식 수업 전제)
   hp: P.maxHp, mp: P.maxMp,
   level: 1, exp: 0,
@@ -691,6 +1003,162 @@ const player = {
 
 function playerRect(){
   return { x: player.x - P.w/2, y: player.y - P.h, w: P.w, h: P.h };
+}
+function curMap(){ return MAPS[curMapId]; }
+// 발밑에 '아래로 내려갈 수 있는' 발판(비-base)이 있는가 (아래 점프 판정 강건화)
+function onDroppable(){
+  const pl = player;
+  for(const pf of platforms){
+    if(pf.base) continue;
+    if(pl.x < pf.x || pl.x > pf.x + pf.w) continue;
+    if(Math.abs(pl.y - pf.y) <= 3) return true;
+  }
+  return false;
+}
+
+// 균열 암벽 파괴 상태 (맵ID:index 별로 영구 저장)
+const brokenWalls = {};
+function wallKey(i){ return curMapId + ":" + i; }
+function activeCrackWalls(){
+  const M = curMap();
+  if(!M.crackWalls) return [];
+  return M.crackWalls.map((w,i)=>({ ...w, i })).filter(w => !brokenWalls[wallKey(w.i)]);
+}
+// 수직 벽(균열 암벽·빙벽)에 x,y가 닿는가 — 벽 슬라이드/충돌 판정
+function wallAt(x, y){
+  const feetTop = y - P.h + 4, feetBot = y - 4;
+  for(const w of activeCrackWalls()){
+    if(x >= w.x && x <= w.x + w.w && feetBot >= w.y && feetTop <= w.y + w.h) return true;
+  }
+  for(const w of (curMap().walls || [])){   // 일반 벽(빙벽 등)
+    if(x >= w.x && x <= w.x + w.w && feetBot >= w.y && feetTop <= w.y + w.h) return true;
+  }
+  return false;
+}
+// 수평 이동 시 벽 충돌 처리 (유성 질주는 균열 암벽을 부숨)
+function collideWalls(prevX){
+  const pl = player;
+  const half = P.w/2;
+  // 균열 암벽
+  for(const w of activeCrackWalls()){
+    if(pl.y - 4 < w.y || pl.y - P.h + 4 > w.y + w.h) continue;
+    const hitR = pl.x + half > w.x && prevX + half <= w.x;   // 왼→오 진입
+    const hitL = pl.x - half < w.x + w.w && prevX - half >= w.x + w.w;
+    if(!(hitR || hitL)) { // 내부에 이미 있으면 통과 방지
+      if(pl.x + half > w.x && pl.x - half < w.x + w.w){ /* overlap */ } else continue;
+    }
+    if(pl.meteorTimer > 0){
+      // 파괴!
+      brokenWalls[wallKey(w.i)] = true;
+      juice.addShake(0.5); juice.addHitstop(0.06); juice.flash = Math.max(juice.flash, 0.3);
+      spawnParticles(w.x + w.w/2, w.y + w.h/2, { n: 40, col: ["#8a7355","#c8b088","#fff","#7cc4ff"], sp0: 80, sp1: 420, l0: .3, l1: .8, grav: 500 });
+      addFloatText(w.x + w.w/2, w.y - 10, "균열 암벽 파괴!", "#ffd93d");
+      saveGame();
+    }else{
+      // 막힘
+      if(pl.x > prevX) pl.x = Math.min(pl.x, w.x - half);
+      else pl.x = Math.max(pl.x, w.x + w.w + half);
+      if(pl.dashTimer > 0) pl.dashTimer = 0;
+    }
+  }
+  // 일반 벽(빙벽 등) — 항상 막힘 (벽 점프 대상)
+  for(const w of (curMap().walls || [])){
+    if(pl.y - 4 < w.y || pl.y - P.h + 4 > w.y + w.h) continue;
+    if(pl.x + half > w.x && pl.x - half < w.x + w.w){
+      if(pl.x > prevX) pl.x = Math.min(pl.x, w.x - half);
+      else pl.x = Math.max(pl.x, w.x + w.w + half);
+    }
+  }
+}
+// 온기 게이지(추운 존): 감소, 불(화로·장판) 근처면 회복
+function updateWarmth(dt){
+  const pl = player;
+  if(!curMap().cold){ pl.warmth = 1; return; }
+  let warming = false;
+  // 점화된 화로 근처
+  for(const b of (curMap().braziers || [])){
+    if(litBraziers[curMapId + ":" + b.id] && Math.abs(pl.x - b.x) < 130) warming = true;
+  }
+  // 화염 장판 위
+  for(const f of fields){ if(Math.abs(pl.x - f.x) < f.w/2 + 30 && Math.abs((pl.y) - f.y) < 70) warming = true; }
+  if(pl.infernoOn || melt) warming = true;
+  if(warming) pl.warmth = Math.min(1, pl.warmth + dt * 0.8);
+  else pl.warmth = Math.max(0, pl.warmth - dt * 0.055 * (hasCharm("heat") ? 0.5 : 1));
+  if(pl.warmth <= 0 && !pl.dead && pl.iframes <= 0){
+    // 저체온 피해 (초당)
+    if((pl.animT % 1) < dt) hurtPlayer(6, pl.x - pl.facing);
+  }
+}
+const litBraziers = {};   // 점화된 화로 상태
+
+// ============================== 이동 술식 (사당·스승 습득) ==============================
+const ABILITIES = {
+  doubleJump: { name:"바람 걸음", key:"Space×2", desc:"공중에서 한 번 더 도약(이중 점프).", col:"#a3e6ff",
+    lines:["바람 사당의 비석이 부드럽게 빛난다.","「바람 걸음」 — 허공을 한 번 더 딛는 술식이 몸에 새겨진다.","이제 공중에서 Space를 한 번 더!"] },
+  wallJump: { name:"도마뱀 발", key:"벽+Space", desc:"벽에 붙어 미끄러지고, 벽을 차고 오른다.", col:"#c8b088",
+    lines:["벽 사당의 룬이 손끝에 옮겨붙는다.","「도마뱀 발」 — 벽을 타고 차오르는 술식.","벽에 붙어 이동키를 누른 채 Space로 벽을 차 보게!"] },
+  wisp: { name:"도깨비불", key:"F", desc:"주위를 밝히는 부유 광원을 켜고 끈다.", col:"#a5f3fc",
+    lines:["작은 불씨가 스스로 떠올라 곁을 맴돈다.","「도깨비불」 — 어둠을 밝히는 길잡이 불.","F 키로 켜고 끌 수 있다. 어둠 속에서 진가를 발휘하지."] },
+  meteorDash: { name:"유성 질주", key:"G", desc:"충전 없이 즉시 고속 돌진 — 균열 암벽을 부수고 레일을 달린다.", col:"#7cc4ff",
+    lines:["유성 사당의 별빛이 발끝으로 쏟아진다.","「유성 질주」 — 별똥별처럼 내닫는 돌진 술식.","G 키다. 균열 난 암벽을 부수고, 광산 레일을 질주할 수 있다!"] },
+  glide: { name:"재의 망토", key:"낙하 중 Space 유지", desc:"낙하 중 점프키를 유지하면 천천히 활공하고 상승 기류를 탄다.", col:"#cbd5e1",
+    lines:["바람의 성소에서 잿빛 망토가 어깨에 드리운다.","「재의 망토」 — 바람을 붙잡아 활공하는 술식.","낙하 중 Space를 유지하면 천천히 내려앉고, 상승 기류를 탈 수 있다."] },
+  blink: { name:"섬화", key:"B", desc:"짧게 점멸 순간이동 — 가시덤불·재의 장막을 통과한다.", col:"#ff8040",
+    lines:["그을린 사당에서 불티가 눈앞을 스친다.","「섬화(閃火)」 — 한순간 불꽃이 되어 사라졌다 나타나는 술식.","B 키다. 가시덤불도, 재의 장막도 이걸로 지나칠 수 있다."] },
+};
+function grantAbility(id){
+  if(player.abilities[id]) return;
+  player.abilities[id] = true;
+  const A = ABILITIES[id];
+  juice.addShake(0.5); juice.addHitstop(0.14); juice.flash = Math.max(juice.flash, 0.5);
+  spawnParticles(player.x, player.y - P.h/2, { n: 50, col: [A.col, "#fff", "#ffd93d"], sp0: 100, sp1: 460, l0: .4, l1: 1.0, add: true, grav: -60 });
+  questBanner("이동 술식 습득! — " + A.name, A.desc, "학생 수첩(Tab)의 '술식' 항목에서 확인");
+  questEvent("ability", id);
+  saveGame();
+}
+// 사당 상호작용 (맵의 shrines: [{x, ability, y?}])
+function shrineNear(){
+  for(const sh of (curMap().shrines || [])){
+    if(Math.abs(player.x - sh.x) < 60 && Math.abs(player.y - (sh.y ?? mapGroundY)) < 90) return sh;
+  }
+  return null;
+}
+function useShrine(sh){
+  const A = ABILITIES[sh.ability];
+  if(player.abilities[sh.ability]){ startDialog(["…이미 이 술식을 익혔다. 비석은 조용하다."], null, A.name + " 사당"); return; }
+  startDialog(A.lines, ()=> grantAbility(sh.ability), A.name + " 사당");
+}
+
+// ============================== 마도각인(부적) — 모루골 대장간 ==============================
+const CHARM_SLOTS = 3;
+const CHARMS = [
+  { id:"heat",    name:"내열의 인장", cost: 20, desc:"화상·용암 피해 감소, 온기 소모 절반", col:"#ff8040" },
+  { id:"magnet",  name:"결정 자석",   cost: 15, desc:"주변 마력 결정 자동 흡수(범위↑)", col:"#a5f3fc" },
+  { id:"feather", name:"깃털 인장",   cost: 25, desc:"낙하 피해 무효 · 이동 속도 +8%", col:"#bbf7d0" },
+  { id:"font",    name:"마나 샘",     cost: 25, desc:"MP 재생 +40%", col:"#7cc4ff" },
+  { id:"combo",   name:"연격의 인장", cost: 30, desc:"콤보 지속 시간 +60%", col:"#fbbf24" },
+  { id:"vigor",   name:"맹화의 인장", cost: 35, desc:"모든 마법 데미지 +10%", col:"#ff5030" },
+];
+function charmDef(id){ return CHARMS.find(c=>c.id===id); }
+function hasCharm(id){ return player.charms.equipped.includes(id); }
+function charmDmgMul(){ return hasCharm("vigor") ? 1.10 : 1; }
+function craftCharm(id){
+  const c = charmDef(id);
+  if(player.charms.owned.includes(id)){ addFloatText(player.x, player.y-70, "이미 제작했다", "#94a3b8"); return; }
+  if(player.crystals < c.cost){ addFloatText(player.x, player.y-70, "마력 결정 부족", "#f87171"); return; }
+  player.crystals -= c.cost;
+  player.charms.owned.push(id);
+  juice.flash = Math.max(juice.flash, 0.25); juice.addShake(0.2);
+  addFloatText(player.x, player.y-70, c.name + " 제작!", c.col);
+  saveGame();
+}
+function toggleCharm(id){
+  if(!player.charms.owned.includes(id)) return;
+  const eq = player.charms.equipped;
+  const i = eq.indexOf(id);
+  if(i >= 0){ eq.splice(i,1); }
+  else { if(eq.length >= CHARM_SLOTS){ addFloatText(player.x, player.y-70, "슬롯이 가득 참 (최대 " + CHARM_SLOTS + ")", "#fbbf24"); return; } eq.push(id); }
+  saveGame();
 }
 
 // ============================== 스탯 랭크 ==============================
@@ -987,6 +1455,10 @@ function questBanner(title, sub, sub2){
 function applyCheat(){
   // 모든 스킬 완전 습득 + 최대 강화
   for(const k of SKILL_ORDER){ player.skills[k] = true; player.skillLv[k] = MAX_SKILL_LV; }
+  // 모든 이동 술식 습득 + 결정 + 각인 전부
+  for(const a in player.abilities) player.abilities[a] = true;
+  player.crystals = Math.max(player.crystals, 999);
+  player.charms.owned = CHARMS.map(c=>c.id);
   player.hasEmber = true;
   boss.defeated = true;
   // 진행 중이던 임시 수업 정리 (전부 습득 상태이므로 learning 해제)
@@ -1191,6 +1663,17 @@ function talkNPC(n){
     return;
   }
   if(n.kind === "sailor"){ talkToSailor(n); return; }
+  if(n.kind === "forge"){ startDialog(n.lines || ["…"], ()=>{ showForge = true; }, n.name); return; }
+  if(n.kind === "master2"){   // 은둔 스승(유키네 등) — 비전 수업 (수업 선택 창)
+    const t = teacherByRef(n.tref);
+    if(t){ talkToTeacher(t); return; }
+    startDialog(n.lines || ["…"], null, n.name); return;
+  }
+  if(n.kind === "ghost"){
+    startDialog(n.lines || ["…"], null, n.name);
+    if(Math.random() < 1) spawnParticles(n.x, (n.y ?? mapGroundY) - 40, { n: 14, col: ["#c4b5fd","#9ca3af","#e2e8f0"], sp0: 20, sp1: 120, l0: .4, l1: 1.0, add: true, grav: -20 });
+    return;
+  }
   if(n.kind === "heal"){
     player.hp = maxHp(); player.mp = maxMp();
     spawnParticles(player.x, player.y - 24, { n: 26, col: ["#8be9fd","#a3e635","#fff"], sp0: 40, sp1: 220, l0: .3, l1: .7, add: true, grav: -40 });
@@ -1386,13 +1869,23 @@ function pickupEmber(){
 
 // 의문의 문 — 잠긴 채 불길한 대사만 (미래 콘텐츠 훅)
 function talkToDoor(){
+  // 고급 1식(인페르노) 이수 후엔 문이 열려 재의 거리로 통한다
+  if(mapDoor.to && player.skills.inferno){
+    juice.addShake(0.3); juice.flash = Math.max(juice.flash, 0.35);
+    spawnParticles(mapDoor.x, mapGroundY - 80, { n: 40, col: ["#b45cff","#7c3aed","#9ca3af","#fff"], sp0: 40, sp1: 260, l0: .4, l1: 1.0, add: true, grav: -30 });
+    startDialog([
+      "의문의 문 — 룬이 인페르노의 열기에 반응하며 스르륵 열린다.",
+      "문 너머로 잿빛 바람과 함께, 끝없이 재가 내리는 옛 도시가 펼쳐진다…",
+    ], ()=>{ startTransition(mapDoor.to, mapDoor.tx, mapDoor.ty); }, "의문의 문");
+    return;
+  }
   const sets = [
     [ "이 문은… 굳게 잠겨 있다.",
       "표면에 낯선 룬이 희미하게 맥동하고 있다.",
       "문 너머에서 아주 희미한 숨소리가 새어 나오는 것 같다…" ],
     [ "아무리 밀어도 꿈쩍도 하지 않는다.",
       "차가운 철문에 손을 대자, 오히려 미지근한 온기가 느껴진다.",
-      "…지금은 열 방법이 없다. 언젠가, 자격을 갖춘 자에게만 열릴 것이다." ],
+      "…아직은 열 방법이 없다. 더 강한 불꽃이 필요할지도. (고급 화염술?)" ],
     [ "룬이 잠시 붉게 번지더니 다시 잦아든다.",
       "\"…아직 이르다.\" — 어디선가 목소리가 스친 듯하다." ],
   ];
@@ -1546,6 +2039,8 @@ function saveGame(){
     localStorage.setItem(SAVE_KEY, JSON.stringify({
       v: 3, qv: 3, level: player.level, exp: player.exp, stats: player.stats,
       skills: player.skills, skillLv: player.skillLv, hasEmber: player.hasEmber,
+      abilities: player.abilities, crystals: player.crystals, charms: player.charms,
+      brokenWalls, litBraziers,
       quest: { idx: questState.idx, prog: Math.floor(questState.prog), doneAll: questState.doneAll },
       teachers: Object.fromEntries(TEACHERS.map(t=>[t.id, teacherState[t.id]])),
       bossDefeated: boss.defeated,
@@ -1562,6 +2057,11 @@ function loadGame(){
     for(const k in player.stats) if(d.stats && d.stats[k]) player.stats[k] = d.stats[k];
     if(d.skills) Object.assign(player.skills, d.skills);
     if(d.skillLv) Object.assign(player.skillLv, d.skillLv);
+    if(d.abilities) Object.assign(player.abilities, d.abilities);
+    player.crystals = d.crystals || 0;
+    if(d.charms) player.charms = { owned: d.charms.owned || [], equipped: d.charms.equipped || [] };
+    if(d.brokenWalls) Object.assign(brokenWalls, d.brokenWalls);
+    if(d.litBraziers) Object.assign(litBraziers, d.litBraziers);
     player.hasEmber = !!d.hasEmber;
     if(d.bossDefeated) boss.defeated = true;   // pd() 판정 전에 먼저 로드
     if(d.qv >= 2){
@@ -1617,7 +2117,7 @@ function updatePlayer(dt){
     return;
   }
 
-  const locked = dialog !== null || showBook || showTrainer || showWorldMap || learnUI !== null || transition !== null;
+  const locked = dialog !== null || showBook || showTrainer || showForge || showWorldMap || learnUI !== null || transition !== null;
 
   // --- 타이머
   pl.boltCd = Math.max(0, pl.boltCd - dt);
@@ -1628,17 +2128,55 @@ function updatePlayer(dt){
   pl.infernoCd = Math.max(0, pl.infernoCd - dt);
   pl.meltCd = Math.max(0, pl.meltCd - dt);
   pl.dashCd = Math.max(0, pl.dashCd - dt);
+  pl.meteorCd = Math.max(0, pl.meteorCd - dt);
+  pl.blinkCd = Math.max(0, pl.blinkCd - dt);
+  pl.coyoteT = Math.max(0, pl.coyoteT - dt);
+  pl.jumpBufT = Math.max(0, pl.jumpBufT - dt);
   pl.dropTimer = Math.max(0, pl.dropTimer - dt);
   pl.iframes = Math.max(0, pl.iframes - dt);
   pl.hurtFlash = Math.max(0, pl.hurtFlash - dt);
   pl.castT = Math.max(0, pl.castT - dt);
   pl.animT += dt;
-  pl.mp = Math.min(maxMp(), pl.mp + P.mpRegen * wilRegenMul() * dt);
+  pl.mp = Math.min(maxMp(), pl.mp + P.mpRegen * wilRegenMul() * (hasCharm("font")?1.4:1) * dt);
+  updateWarmth(dt);
 
   const charging = pl.fbCharge >= 0;
+  const canAct = !locked && !pl.infernoOn;
+
+  // --- 점프 입력 버퍼링 (착지 직전 선입력 허용)
+  if(canAct && inp.jumpP()) pl.jumpBufT = P.jumpBuf;
+  if(canAct) pl.jumpHolding = inp.jumpHeld();
+
+  // --- 도깨비불 토글
+  if(canAct && pl.abilities.wisp && inp.wispP()){
+    pl.wispOn = !pl.wispOn;
+    addFloatText(pl.x, pl.y - P.h - 20, pl.wispOn ? "도깨비불 켜짐" : "도깨비불 꺼짐", "#a5f3fc");
+  }
+
+  // --- 섬화(점멸): 짧은 순간이동 + 무적, 가시덤불·재의 장막 통과
+  if(canAct && pl.abilities.blink && inp.blinkP() && pl.blinkCd <= 0 && pl.dashTimer <= 0){
+    const dir = (inp.left() && !inp.right()) ? -1 : (inp.right() ? 1 : pl.facing);
+    pl.facing = dir;
+    const nx = clamp(pl.x + dir * P.blinkDist, P.w/2, mapW - P.w/2);
+    for(let g=0;g<6;g++) spawnParticles(lerp(pl.x, nx, g/6), pl.y - P.h/2, { n: 3, col: ["#ff6a3a","#ffd27f","#3a1206"], sp0: 20, sp1: 120, l0: .15, l1: .4, add: true });
+    pl.x = nx; pl.vx = dir * Math.max(Math.abs(pl.vx), P.runSpeed*0.5);
+    pl.blinkCd = P.blinkCd; pl.iframes = Math.max(pl.iframes, 0.22);
+    juice.addShake(0.12);
+  }
+
+  // --- 유성 질주: 강력한 수평 돌진 (균열 암벽 파괴 · 레일 주행)
+  if(canAct && pl.abilities.meteorDash && inp.meteorP() && pl.meteorCd <= 0 && pl.dashTimer <= 0 && !charging){
+    pl.meteorDir = (inp.left() && !inp.right()) ? -1 : (inp.right() ? 1 : pl.facing);
+    pl.facing = pl.meteorDir;
+    pl.meteorTimer = P.meteorTime;
+    pl.meteorCd = P.meteorCd;
+    pl.iframes = Math.max(pl.iframes, P.meteorTime + 0.05);
+    juice.addShake(0.35);
+    trainStat("agi", 0.5, true);
+  }
 
   // --- 대시
-  if(!locked && !pl.infernoOn && inp.dashP() && pl.dashCd <= 0 && !charging){
+  if(canAct && inp.dashP() && pl.dashCd <= 0 && !charging && pl.meteorTimer <= 0){
     pl.dashTimer = P.dashTime;
     pl.dashCd = P.dashCd * dashCdMul();
     trainStat("agi", 0.5, true);
@@ -1649,7 +2187,15 @@ function updatePlayer(dt){
     spawnParticles(pl.x, pl.y - P.h/2, { n: 10, col: ["#ffd27f","#fff"], sp0: 40, sp1: 140, l0: .15, l1: .35, add: true });
   }
 
-  if(pl.dashTimer > 0){
+  if(pl.meteorTimer > 0){
+    // 유성 질주 진행 (레일 위면 레일 경로를 따라감)
+    pl.meteorTimer -= dt;
+    const spd = P.meteorSpeed * (pl.onRail ? 1.15 : 1);
+    pl.vx = pl.meteorDir * spd;
+    if(!pl.onRail) pl.vy = 0;
+    pl.trail.push({ x: pl.x, y: pl.y, t: 0.28, f: pl.facing, meteor: true });
+    if(Math.random() < 0.9) spawnParticles(pl.x - pl.meteorDir*20, pl.y - P.h/2, { n: 2, col: ["#7cc4ff","#eaf6ff","#fff"], sp0: 40, sp1: 200, l0: .12, l1: .35, add: true });
+  }else if(pl.dashTimer > 0){
     pl.dashTimer -= dt;
     pl.vx = pl.dashDir * P.dashSpeed;
     pl.vy = 0;
@@ -1657,12 +2203,11 @@ function updatePlayer(dt){
   }else{
     const mv = (locked || pl.infernoOn) ? 0 : (inp.right()?1:0) - (inp.left()?1:0);
     const ctrl = pl.onGround ? 1 : P.airControl;
-    const speedCap = (charging ? P.runSpeed * 0.4 : P.runSpeed) * agiSpeedMul();
+    const speedCap = (charging ? P.runSpeed * 0.4 : P.runSpeed) * agiSpeedMul() * (pl.warmth < 0.001 ? 0.75 : 1) * (hasCharm("feather") ? 1.08 : 1);
     if(mv !== 0){
       pl.facing = mv;
       pl.vx += mv * P.accel * ctrl * dt;
       pl.vx = clamp(pl.vx, -speedCap, speedCap);
-      // 튜토리얼: 이동 거리 퀘스트
       const wq = curQuest();
       if(wq && wq.type === "walk" && pl.onGround){
         questState.prog += Math.abs(pl.vx) * dt;
@@ -1672,25 +2217,60 @@ function updatePlayer(dt){
       const f = P.friction * ctrl * dt;
       if(Math.abs(pl.vx) <= f) pl.vx = 0; else pl.vx -= sign(pl.vx)*f;
     }
-    if(!locked && !pl.infernoOn && inp.jumpP()){
-      if(pl.onGround){
-        if(inp.down() && pl.standingDrop){
-          // 아래 점프: 발판·위층 바닥을 통과해 아래 블럭으로
-          pl.dropTimer = P.dropTime;
-          pl.onGround = false;
-          pl.vy = 60;   // 즉시 낙하 시작
-          questEvent("act", "dropjump");
+
+    // --- 점프 (코요테·버퍼·이중점프·벽점프·가변)
+    const maxJumps = pl.abilities.doubleJump ? 2 : 1;
+    if(canAct && pl.jumpBufT > 0){
+      if(pl.wallSlide && pl.abilities.wallJump){
+        // 벽 점프: 벽 반대 방향으로 튕김
+        pl.vx = -pl.wallDir * P.wallJumpVX;
+        pl.vy = P.wallJumpVY;
+        pl.facing = -pl.wallDir;
+        pl.jumpsUsed = 1; pl.wallSlide = false; pl.jumpBufT = 0;
+        pl.onGround = false; pl.coyoteT = 0;
+        questEvent("act", "jump");
+        spawnParticles(pl.x + pl.wallDir*12, pl.y - P.h/2, { n: 10, col: ["#cbd5e1","#fff"], sp0: 40, sp1: 160, l0: .15, l1: .35 });
+      }else if(pl.onGround || pl.coyoteT > 0){
+        if(inp.down() && (pl.standingDrop || onDroppable())){
+          pl.dropTimer = P.dropTime; pl.onGround = false; pl.vy = 60;
+          pl.jumpBufT = 0; questEvent("act", "dropjump");
           spawnParticles(pl.x, pl.y + 2, { n: 5, col: "#cbd5e1", sp0: 20, sp1: 70, l0: .15, l1: .3, ang: Math.PI/2, spread: 1.0 });
         }else{
-          pl.vy = P.jumpV;
-          pl.onGround = false;
-          trainStat("agi", 0.2, true);
-          questEvent("act", "jump");
+          pl.vy = P.jumpV; pl.onGround = false; pl.coyoteT = 0;
+          pl.jumpsUsed = 1; pl.jumpBufT = 0;
+          trainStat("agi", 0.2, true); questEvent("act", "jump");
           spawnParticles(pl.x, pl.y, { n: 6, col: "#cbd5e1", sp0: 30, sp1: 90, l0: .2, l1: .4, ang: -Math.PI/2, spread: 1.2 });
         }
+      }else if(pl.jumpsUsed < maxJumps){
+        // 이중 점프 (바람 걸음)
+        pl.vy = P.airJumpV; pl.jumpsUsed++; pl.jumpBufT = 0; pl.gliding = false;
+        spawnParticles(pl.x, pl.y - 4, { n: 14, col: ["#a3e6ff","#eaf6ff","#fff"], sp0: 50, sp1: 190, l0: .2, l1: .5, add: true, grav: 200 });
+        juice.addShake(0.08);
       }
     }
-    pl.vy += GRAV * dt;
+    // 가변 점프: 상승 중 키를 떼면 상승 컷
+    if(!pl.jumpHolding && pl.vy < P.jumpV * P.jumpCut) pl.vy = P.jumpV * P.jumpCut;
+
+    // --- 활공(재의 망토): 하강 중 점프 유지 → 완강하
+    pl.gliding = false;
+    if(pl.abilities.glide && !pl.onGround && pl.vy > 0 && pl.jumpHolding && pl.meteorTimer <= 0){
+      pl.gliding = true;
+      pl.vy = Math.min(pl.vy + GRAV*dt*0.25, P.glideFall);
+      if(Math.random() < 0.3) spawnParticles(pl.x + rand(-12,12), pl.y - P.h + 6, { n: 1, col:["#94a3b8","#cbd5e1"], sp0: 4, sp1: 20, l0:.3, l1:.7, grav:-30 });
+    }else{
+      pl.vy += GRAV * dt;
+    }
+    // 벽 슬라이드: 낙하 감속
+    if(pl.wallSlide && pl.vy > 0) pl.vy = Math.min(pl.vy, P.wallSlideMax);
+    // 상승 기류(부유 정원): 기둥 안이면 위로 실어 올림 (중력 무시)
+    for(const u of (curMap().updrafts || [])){
+      if(pl.x >= u.x - u.w/2 && pl.x <= u.x + u.w/2 && pl.y > u.top){
+        pl.vy = (pl.jumpHolding && pl.abilities.glide) ? -640 : (pl.abilities.glide ? -420 : -260);
+        pl.jumpsUsed = 0; pl.onGround = false;
+        if(Math.random() < 0.6) spawnParticles(pl.x + rand(-u.w/2,u.w/2), pl.y, { n: 1, col:["#bbf7d0","#eaf6ff","#fff"], sp0: 20, sp1: 80, ang:-Math.PI/2, spread:.3, l0:.3, l1:.8, add:true, grav:-100 });
+      }
+    }
+    pl.vy = Math.min(pl.vy, P.maxFall);
   }
 
   for(let i=pl.trail.length-1;i>=0;i--){
@@ -1699,7 +2279,10 @@ function updatePlayer(dt){
   }
 
   // --- 이동 & 충돌
+  const prevX = pl.x;
   pl.x = clamp(pl.x + pl.vx*dt, P.w/2, mapW - P.w/2);
+  // 유성 질주 균열 암벽 파괴 + 벽 충돌
+  collideWalls(prevX);
   if(curMapId === "forest"){
     if(boss.active && BOSS_M && !BOSS_M.dead){
       pl.x = clamp(pl.x, ARENA_L + 20, ARENA_R - 20);
@@ -1711,25 +2294,36 @@ function updatePlayer(dt){
     }
   }
   const prevFeet = pl.y;
+  const wasAir = !pl.onGround;
   pl.y += pl.vy*dt;
   pl.onGround = false;
   pl.standingOneway = false;
   pl.standingDrop = false;
-  if(pl.vy >= 0){
+  pl.onRail = null;
+  // --- 유성 질주 레일: 레일 구간에 진입하면 경로를 따라 활강
+  if(pl.meteorTimer > 0){
+    for(const r of (curMap().rails || [])){
+      const xa = Math.min(r.x0, r.x1), xb = Math.max(r.x0, r.x1);
+      if(pl.x < xa || pl.x > xb) continue;
+      const t = clamp((pl.x - r.x0) / (r.x1 - r.x0), 0, 1);
+      const ry = r.y0 + (r.y1 - r.y0) * t;
+      if(Math.abs(pl.y - ry) < 90){ pl.y = ry; pl.vy = 0; pl.onRail = r; break; }
+    }
+  }
+  if(pl.vy >= 0 && !pl.onRail){
     for(const pf of platforms){
-      // 하강 점프 중엔 최하층(base)을 제외한 모든 발판/층 통과
       if(!pf.base && pl.dropTimer > 0) continue;
       if(pl.x < pf.x || pl.x > pf.x + pf.w) continue;
       if(prevFeet <= pf.y + 1 && pl.y >= pf.y){
         pl.y = pf.y; pl.vy = 0; pl.onGround = true;
         pl.standingOneway = !pf.solidGround;
-        pl.standingDrop = !pf.base;   // 최하층이 아니면 ↓+Space로 아래로
+        pl.standingDrop = !pf.base;
         break;
       }
     }
   }
-  // --- 계단(대각선 발판): 걸어서 부드럽게 오르내림 (본관 층 이동)
-  if(pl.vy >= 0 && pl.dropTimer <= 0){
+  // --- 계단(대각선 발판)
+  if(pl.vy >= 0 && pl.dropTimer <= 0 && !pl.onRail){
     for(const s of stairs){
       const xa = Math.min(s.x0, s.x1), xb = Math.max(s.x0, s.x1);
       if(pl.x < xa || pl.x > xb) continue;
@@ -1739,6 +2333,23 @@ function updatePlayer(dt){
         pl.y = sy; pl.vy = 0; pl.onGround = true;
         break;
       }
+    }
+  }
+  // --- 착지/공중 상태 갱신 (코요테·점프 리셋·착지 먼지)
+  if(pl.onGround){
+    pl.coyoteT = P.coyote;
+    pl.jumpsUsed = 0;
+    pl.wallSlide = false; pl.wallDir = 0;
+    if(wasAir && pl.vy === 0 && prevFeet < pl.y - 0.5){}   // (no-op guard)
+    if(wasAir) spawnParticles(pl.x, pl.y, { n: 4, col:["#cbd5e1","#e2e8f0"], sp0: 20, sp1: 80, l0:.1, l1:.25, ang: -Math.PI/2, spread: 2.2 });
+  }
+  // --- 벽 슬라이드 감지 (도마뱀 발): 공중에서 벽에 붙어 이동키를 누르면
+  pl.wallSlide = false;
+  if(pl.abilities.wallJump && !pl.onGround && pl.vy > -20 && pl.meteorTimer <= 0 && pl.dashTimer <= 0){
+    const wantDir = (inp.right()?1:0) - (inp.left()?1:0);
+    if(wantDir !== 0 && wallAt(pl.x + wantDir * (P.w/2 + 3), pl.y)){
+      pl.wallSlide = true; pl.wallDir = wantDir; pl.jumpsUsed = 0;
+      if(Math.random() < 0.4) spawnParticles(pl.x + wantDir*14, pl.y - P.h*0.5, { n:1, col:["#94a3b8"], sp0: 6, sp1: 30, l0:.15, l1:.35, grav: 200 });
     }
   }
 
@@ -2087,7 +2698,7 @@ function updateMonsters(dt){
 function hitMonster(m, baseDmg, kb, pr){
   const d = MOB_DEFS[m.type];
   const crit = Math.random() < critChance();
-  const dmg = Math.floor(baseDmg * (crit ? CRIT_MUL : 1));
+  const dmg = Math.floor(baseDmg * (crit ? CRIT_MUL : 1) * charmDmgMul());
   m.hp -= dmg;
   m.hurtFlash = 0.12;
   m.hpBarTimer = 3.0;
@@ -2113,6 +2724,10 @@ function hitMonster(m, baseDmg, kb, pr){
     gainExp(d.exp);
     questEvent("kill", m.type);
     trainStat("str", 1.5, true);
+    // 마력 결정 드랍
+    const cry = Math.max(1, Math.round(d.exp / 12)) * (hasCharm("magnet") ? 2 : 1);
+    player.crystals += cry;
+    addFloatText(m.x, m.y - d.h - 6, "💎 +" + cry, "#a5f3fc");
     if(m.type === "boss"){
       boss.defeated = true; boss.active = false;
       spikes.length = 0; eprojs.length = 0;
@@ -2253,7 +2868,7 @@ function updateEprojs(dt){
 }
 
 // ============================== UPDATE ==============================
-let showHelp = true, showBook = false, showTrainer = false, bookPage = 0;
+let showHelp = true, showBook = false, showTrainer = false, showForge = false, bookPage = 0;
 let gameState = "title", titleT = 0, showOptions = false, optResetArm = 0, showWorldMap = false;
 
 // 타이틀 버튼 영역
@@ -2342,6 +2957,19 @@ function update(dt){
         if(pressed[String(i+1)]) upgradeSkill(SKILL_ORDER[i]);
       }
     }
+  }else if(showForge){
+    // 각인 공방: [1~6] 제작, Shift+[1~6] 장착 토글, E/Tab/Esc 닫기
+    if(pressed["e"] || pressed["Tab"] || pressed["Escape"]){
+      showForge = false; pressed["e"] = pressed["Tab"] = pressed["Escape"] = false;
+    }else{
+      for(let i = 0; i < CHARMS.length; i++){
+        if(pressed[String(i+1)]){
+          if(keys["Shift"]) toggleCharm(CHARMS[i].id);
+          else if(player.charms.owned.includes(CHARMS[i].id)) toggleCharm(CHARMS[i].id);
+          else craftCharm(CHARMS[i].id);
+        }
+      }
+    }
   }else{
     if(inp.helpP()) showHelp = !showHelp;
     if(inp.bookP()){ showBook = !showBook; showWorldMap = false; bookPage = 0; }
@@ -2370,6 +2998,9 @@ function update(dt){
       for(const p of portals){
         const py = p.y ?? mapGroundY;
         if(Math.abs(player.x - p.x) < 46 && Math.abs(player.y - py) < 90){
+          if(p.needAbility && !player.abilities[p.needAbility]){
+            addFloatText(p.x, py - 100, "「" + ABILITIES[p.needAbility].name + "」이(가) 있어야 지날 수 있다", "#f87171"); used = true; break;
+          }
           startTransition(p.to, p.tx, p.ty); used = true; break;
         }
       }
@@ -2382,6 +3013,29 @@ function update(dt){
     }
     if(!used && !transition && pressed["e"] && mapDoor && Math.abs(player.x - mapDoor.x) < 62){
       talkToDoor(); used = true;
+    }
+    // 이동 술식 사당
+    if(!used && !transition && pressed["e"]){
+      const sh = shrineNear();
+      if(sh){ useShrine(sh); used = true; }
+    }
+    // 화로 점화 (추운 존 — 불티로 온기 확보)
+    if(!used && !transition && pressed["e"]){
+      for(const br of (curMap().braziers || [])){
+        if(Math.abs(player.x - br.x) < 48 && Math.abs(player.y - (br.y ?? mapGroundY)) < 90){
+          const key = curMapId + ":" + br.id;
+          if(litBraziers[key]){ addFloatText(br.x, (br.y ?? mapGroundY) - 60, "이미 타오르고 있다", "#ffb35c"); }
+          else if(!player.skills.bolt){ addFloatText(br.x, (br.y ?? mapGroundY) - 60, "불 마법이 필요하다 (불티)", "#f87171"); }
+          else {
+            litBraziers[key] = true;
+            spawnParticles(br.x, (br.y ?? mapGroundY) - 30, { n: 24, col: ["#ff7b3a","#ffd27f","#fff"], sp0: 60, sp1: 260, l0: .3, l1: .8, add: true, grav: -80 });
+            addFloatText(br.x, (br.y ?? mapGroundY) - 60, "화로 점화! 온기 확보", "#ffd93d");
+            questEvent("brazier", curMapId);
+            saveGame();
+          }
+          used = true; break;
+        }
+      }
     }
     // 퀘스트 조사·수집 지점
     if(!used && !transition && pressed["e"]){
@@ -2502,18 +3156,44 @@ function render(){
     sky.addColorStop(0, "#2a0f10"); sky.addColorStop(0.5, "#4a1512"); sky.addColorStop(1, "#7a2410");
   }else if(mapTheme === "coast"){
     sky.addColorStop(0, "#241a33"); sky.addColorStop(0.45, "#4a2c45"); sky.addColorStop(1, "#7a4a3d");
+  }else if(mapTheme === "snow"){
+    sky.addColorStop(0, "#3a4155"); sky.addColorStop(0.55, "#5a6577"); sky.addColorStop(1, "#8a97a8");
+  }else if(mapTheme === "ice"){
+    sky.addColorStop(0, "#1a2a44"); sky.addColorStop(0.5, "#2c4468"); sky.addColorStop(1, "#5a7a9c");
+  }else if(mapTheme === "mine"){
+    sky.addColorStop(0, "#0a0916"); sky.addColorStop(0.6, "#12102a"); sky.addColorStop(1, "#1c1840");
+  }else if(mapTheme === "forge"){
+    sky.addColorStop(0, "#1c1512"); sky.addColorStop(0.6, "#2e1f16"); sky.addColorStop(1, "#4a2c18");
+  }else if(mapTheme === "garden"){
+    sky.addColorStop(0, "#8fbce0"); sky.addColorStop(0.5, "#bcd8ea"); sky.addColorStop(1, "#e3f0f5");
+  }else if(mapTheme === "ash"){
+    sky.addColorStop(0, "#1a1a1f"); sky.addColorStop(0.6, "#2a2a30"); sky.addColorStop(1, "#3a3a42");
+  }else if(mapTheme === "temple"){
+    sky.addColorStop(0, "#1c1810"); sky.addColorStop(0.6, "#332a16"); sky.addColorStop(1, "#5a4a24");
   }else{
     sky.addColorStop(0, "#141a33"); sky.addColorStop(0.6, "#23294d"); sky.addColorStop(1, "#31294a");
   }
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+  // 눈/재 낙하 (설산·얼음·재의 거리)
+  if(mapTheme === "snow" || mapTheme === "ice" || mapTheme === "ash"){
+    const col = mapTheme === "ash" ? "rgba(180,180,185,.5)" : "rgba(255,255,255,.7)";
+    ctx.fillStyle = col;
+    for(let i=0;i<70;i++){
+      const t = performance.now()/1000;
+      const sx = ((i*137 + t*(mapTheme==="ash"?26:48)) % (VIEW_W+40)) - 20;
+      const sy = ((i*89 + t*(mapTheme==="ash"?60:110)) % (VIEW_H+40)) - 20;
+      ctx.fillRect(sx, sy, 2, 2);
+    }
+  }
 
   // 달/해 (실내·지하실 제외)
+  const darkTheme = mapTheme === "basement" || mapTheme === "school" || mapTheme === "volcano" || mapTheme === "mine" || mapTheme === "forge" || mapTheme === "temple";
   const skyVisible = camY < mapGroundY - 240;   // 뷰가 지하로 완전히 내려가면 천체 숨김
   if(skyVisible && (mapTheme === "harbor" || mapTheme === "coast")){
     ctx.fillStyle = "#ffe9b0";
     ctx.beginPath(); ctx.arc(980 - camX*0.05, 130, 44, 0, Math.PI*2); ctx.fill();
-  }else if(skyVisible && mapTheme !== "basement" && mapTheme !== "school" && mapTheme !== "volcano"){
+  }else if(skyVisible && !darkTheme && mapTheme !== "ash"){
     ctx.fillStyle = "#e9e6ff";
     ctx.beginPath(); ctx.arc(1080 - camX*0.05, 110, 38, 0, Math.PI*2); ctx.fill();
     ctx.fillStyle = mapTheme === "campus" ? "#1a1533" : mapTheme === "town" ? "#241a33" : "#141a33";
@@ -2601,6 +3281,13 @@ function render(){
     forest:   { base:"#2d3b2d", top:"#4a6741" },
     volcano:  { base:"#2e1712", top:"#5a2418" },
     coast:    { base:"#5a4130", top:"#7a5738" },
+    snow:     { base:"#6a7488", top:"#c8d4e2" },
+    ice:      { base:"#3a5578", top:"#9ec8e8" },
+    mine:     { base:"#221f38", top:"#3a3560" },
+    forge:    { base:"#3a2418", top:"#5a3a22" },
+    garden:   { base:"#4a6b4a", top:"#7aa87a" },
+    ash:      { base:"#2a2a30", top:"#48484f" },
+    temple:   { base:"#3a2c16", top:"#6a5228" },
   };
   for(const pf of platforms){
     const g = GT[mapTheme] || GT.forest;
@@ -2787,6 +3474,9 @@ function render(){
 
   // --- 범용 퀘스트 수집 지점 (교과서·목걸이 등)
   { const q = curQuest(); if(q && q.type === "inspect" && q.spot && q.spot.map === curMapId) drawQuestSpot(q.spot); }
+
+  // --- 존 기믹 (레일·상승기류·벽·균열암벽·화로·사당·재의 장막)
+  drawZoneGimmicks();
 
   // --- 화염 장판
   for(const f of fields){
@@ -3073,15 +3763,36 @@ function render(){
     ctx.fillRect(0, 0, VIEW_W, VIEW_H);
   }
 
-  // 지하실 비네트 (시야 제한 — 플레이어 주변만 은은히 밝게)
-  if(mapTheme === "basement"){
+  // 어둠 비네트 (지하실·광산) — 도깨비불 켜면 시야 확대
+  if(mapTheme === "basement" || mapTheme === "mine"){
     const plsx = player.x - camX, plsy = player.y - camY - 40;
-    const vg = ctx.createRadialGradient(plsx, plsy, 120, plsx, plsy, 640);
+    const rad = player.wispOn ? 460 : (mapTheme === "mine" ? 300 : 260);
+    const outer = player.wispOn ? 940 : 640;
+    const vg = ctx.createRadialGradient(plsx, plsy, rad, plsx, plsy, outer);
     vg.addColorStop(0, "rgba(0,0,0,0)");
     vg.addColorStop(0.6, "rgba(3,4,7,0.4)");
-    vg.addColorStop(1, "rgba(2,3,5,0.82)");
+    vg.addColorStop(1, mapTheme === "mine" ? "rgba(4,3,10,0.9)" : "rgba(2,3,5,0.82)");
     ctx.fillStyle = vg;
     ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    if(player.wispOn){
+      ctx.save(); ctx.globalCompositeOperation = "lighter";
+      const wg = ctx.createRadialGradient(plsx, plsy, 4, plsx, plsy, 120);
+      wg.addColorStop(0, "rgba(165,243,252,.35)"); wg.addColorStop(1, "rgba(165,243,252,0)");
+      ctx.fillStyle = wg; ctx.beginPath(); ctx.arc(plsx, plsy, 120, 0, Math.PI*2); ctx.fill();
+      ctx.restore();
+    }
+  }
+  // 온기 게이지 (추운 존)
+  if(curMap().cold && gameState === "play"){
+    const gw = 220, gx = VIEW_W/2 - gw/2, gy = 92;
+    ctx.fillStyle = "rgba(10,12,24,.7)"; roundRect(gx-4, gy-4, gw+8, 22, 6); ctx.fill();
+    const warm = player.warmth;
+    ctx.fillStyle = warm > 0.35 ? "#ff9d4d" : "#ef4444";
+    ctx.fillRect(gx, gy, gw*warm, 14);
+    ctx.textAlign = "center"; ctx.font = "bold 12px sans-serif"; ctx.fillStyle = "#fff";
+    ctx.fillText(warm <= 0 ? "❄ 저체온 위험! 화로에 불을 붙여라" : "🔥 온기", VIEW_W/2, gy - 8);
+    if(warm <= 0){ const a = 0.12 + Math.sin(performance.now()/120)*0.06;
+      ctx.fillStyle = `rgba(120,180,255,${a})`; ctx.fillRect(0,0,VIEW_W,VIEW_H); }
   }
 
   if(gameState === "title"){
@@ -3147,7 +3858,7 @@ function renderTitle(){
 
   ctx.font = "12px sans-serif"; ctx.fillStyle = "rgba(148,163,184,.6)";
   ctx.fillText("Enter / Space / 클릭으로 시작", VIEW_W/2, 612);
-  ctx.fillText("프로토타입 v0.15 — 아르카나 아카데미", VIEW_W/2, VIEW_H - 20);
+  ctx.fillText("프로토타입 v0.19 — 아르카나 아카데미", VIEW_W/2, VIEW_H - 20);
   ctx.restore();
 
   if(showOptions) renderOptions();
@@ -3264,17 +3975,28 @@ function renderMinimap(){
 
 // 월드맵 노드 (아르피아/메이플식 지역 연결도)
 const WORLD_NODES = [
-  { id:"school",   name:"본관",          x: 300, y: 220, col:"#ffd27f",
+  { id:"garden",   name:"부유 정원",     x: 560, y: 60,  col:"#bbf7d0", tag:"상승 기류 · 활공" },
+  { id:"school",   name:"본관",          x: 300, y: 210, col:"#ffd27f",
     rooms:["classbasic","classinter","classadv","library","principal","infirmary","shoproom","trainhall"] },
-  { id:"campus",   name:"아르카나 언덕", x: 490, y: 250, col:"#c4b5fd", rooms:["clubroom"], tag:"허브 · 시계탑" },
-  { id:"forest",   name:"깊은 숲",       x: 700, y: 200, col:"#5fd068", tag:"캐노피 · 심연 · 시험장" },
-  { id:"basement", name:"지하 미궁",     x: 490, y: 430, col:"#4ade80", tag:"세계의 교차로" },
-  { id:"village",  name:"노을 해안",     x: 250, y: 340, col:"#f0abfc", tag:"마을 · 항구 · 등대" },
-  { id:"firevil",  name:"불의 마을",     x: 250, y: 490, col:"#ff5030", tag:"화산 · 화염 군주" },
+  { id:"campus",   name:"아르카나 언덕", x: 470, y: 235, col:"#c4b5fd", rooms:["clubroom"], tag:"허브 · 시계탑" },
+  { id:"forest",   name:"깊은 숲",       x: 690, y: 200, col:"#5fd068", tag:"캐노피 · 심연 · 시험장" },
+  { id:"frost",    name:"서리고개",      x: 150, y: 140, col:"#bfe3ff", tag:"온기 게이지" },
+  { id:"icevil",   name:"얼음 마을",     x: 320, y: 90,  col:"#dbeafe", tag:"빙판 · 은둔 스승" },
+  { id:"village",  name:"노을 해안",     x: 220, y: 320, col:"#f0abfc", tag:"마을 · 항구 · 등대" },
+  { id:"basement", name:"지하 미궁",     x: 470, y: 400, col:"#4ade80", tag:"세계의 교차로" },
+  { id:"starmine", name:"별빛 광산",     x: 720, y: 400, col:"#c4b5fd", tag:"유성 질주 레일" },
+  { id:"morugol",  name:"모루골",        x: 300, y: 470, col:"#ff8040", tag:"대장간 · 각인" },
+  { id:"firevil",  name:"불의 마을",     x: 150, y: 470, col:"#ff5030", tag:"화산 · 투기장" },
+  { id:"ashstreet",name:"재의 거리",     x: 500, y: 560, col:"#9ca3af", tag:"유령 · 거울 보스" },
+  { id:"temple",   name:"첫 불꽃의 신전",x: 650, y: 620, col:"#ffd93d", tag:"최종 지역" },
 ];
 const WORLD_EDGES = [
   ["school","campus"], ["campus","forest"], ["campus","village"], ["campus","basement"],
   ["school","basement"], ["forest","basement"], ["village","basement"], ["village","firevil"],
+  ["campus","garden"], ["village","frost"], ["frost","icevil"], ["icevil","garden"],
+  ["forest","starmine"], ["basement","starmine"], ["icevil","starmine"],
+  ["basement","morugol"], ["morugol","firevil"], ["morugol","ashstreet"],
+  ["basement","ashstreet"], ["ashstreet","temple"],
 ];
 function worldNodeOf(mapId){
   return WORLD_NODES.find(n => n.id === mapId || (n.rooms && n.rooms.includes(mapId)));
@@ -3657,6 +4379,101 @@ function drawTome(){
 }
 
 // 범용 퀘스트 수집 지점 — 금빛 반짝임 + 라벨 + E 프롬프트
+// 존 기믹 렌더 (월드 좌표)
+function drawZoneGimmicks(){
+  const M = curMap();
+  const nearP = (x,y)=> !dialog && !transition && !player.dead && Math.abs(player.x-x)<60 && Math.abs(player.y-(y??mapGroundY))<90;
+  // 유성 질주 레일
+  for(const r of (M.rails || [])){
+    ctx.save(); ctx.globalCompositeOperation = "lighter";
+    ctx.strokeStyle = "rgba(124,196,255,.55)"; ctx.lineWidth = 4; ctx.setLineDash([14, 10]);
+    ctx.beginPath(); ctx.moveTo(r.x0, r.y0); ctx.lineTo(r.x1, r.y1); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.strokeStyle = "rgba(180,220,255,.25)"; ctx.lineWidth = 10;
+    ctx.beginPath(); ctx.moveTo(r.x0, r.y0); ctx.lineTo(r.x1, r.y1); ctx.stroke();
+    ctx.restore();
+  }
+  // 상승 기류
+  for(const u of (M.updrafts || [])){
+    ctx.save(); ctx.globalCompositeOperation = "lighter";
+    const g = ctx.createLinearGradient(0, u.top, 0, mapH);
+    g.addColorStop(0, "rgba(187,247,208,.28)"); g.addColorStop(1, "rgba(187,247,208,.02)");
+    ctx.fillStyle = g; ctx.fillRect(u.x - u.w/2, u.top, u.w, mapH - u.top);
+    ctx.restore();
+  }
+  // 일반 벽(빙벽 등)
+  for(const w of (M.walls || [])){
+    ctx.fillStyle = mapTheme === "ice" ? "rgba(180,220,255,.55)" : "#3a4155";
+    ctx.fillRect(w.x, w.y, w.w, w.h);
+    ctx.fillStyle = "rgba(255,255,255,.25)"; ctx.fillRect(w.x, w.y, 3, w.h);
+  }
+  // 균열 암벽 (미파괴만)
+  for(const w of activeCrackWalls()){
+    ctx.fillStyle = "#4a4038"; ctx.fillRect(w.x - 4, w.y, w.w + 8, w.h);
+    ctx.strokeStyle = "#20140c"; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(w.x + w.w*0.5, w.y); ctx.lineTo(w.x + w.w*0.2, w.y + w.h*0.4);
+    ctx.lineTo(w.x + w.w*0.7, w.y + w.h*0.7); ctx.lineTo(w.x + w.w*0.4, w.y + w.h);
+    ctx.stroke();
+    ctx.fillStyle = "#8be9fd"; ctx.font = "10px sans-serif"; ctx.textAlign = "center";
+    if(nearP(w.x + w.w/2, w.y + w.h/2)) ctx.fillText("유성 질주로 파괴", w.x + w.w/2, w.y - 8);
+  }
+  // 재의 장막
+  for(const v of (M.veils || [])){
+    ctx.save();
+    const dist = Math.abs(player.x - v.x);
+    ctx.globalAlpha = player.abilities.blink ? 0.5 : 0.82;
+    ctx.fillStyle = "rgba(90,90,96,.9)"; ctx.fillRect(v.x - v.w/2, camY, v.w, VIEW_H);
+    ctx.restore();
+    if(nearP(v.x, mapGroundY)){
+      ctx.fillStyle = "#ff8040"; ctx.font = "bold 12px sans-serif"; ctx.textAlign = "center";
+      ctx.fillText(player.abilities.blink ? "섬화(B)로 통과" : "섬화가 필요하다", v.x, mapGroundY - 120);
+    }
+  }
+  // 화로 (추운 존)
+  for(const b of (M.braziers || [])){
+    const bx = b.x, by = (b.y ?? mapGroundY);
+    const lit = litBraziers[curMapId + ":" + b.id];
+    ctx.fillStyle = "#3a3028"; ctx.fillRect(bx - 12, by - 26, 24, 26);
+    ctx.fillStyle = "#4a4038"; ctx.fillRect(bx - 16, by - 4, 32, 6);
+    if(lit){
+      ctx.save(); ctx.globalCompositeOperation = "lighter";
+      const fl = 0.7 + Math.sin(performance.now()/90)*0.3;
+      const g = ctx.createRadialGradient(bx, by - 34, 2, bx, by - 34, 44*fl);
+      g.addColorStop(0, "rgba(255,220,150,.9)"); g.addColorStop(0.4, "rgba(255,130,50,.5)"); g.addColorStop(1, "rgba(255,90,20,0)");
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(bx, by - 34, 44*fl, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = "#ffe08a"; ctx.beginPath(); ctx.moveTo(bx-6, by-26); ctx.lineTo(bx, by-46-fl*6); ctx.lineTo(bx+6, by-26); ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }else if(nearP(bx, by)){
+      ctx.fillStyle = "#8be9fd"; ctx.font = "bold 12px sans-serif"; ctx.textAlign = "center";
+      ctx.fillText("E: 불 붙이기", bx, by - 44);
+    }
+  }
+  // 이동 술식 사당
+  for(const sh of (M.shrines || [])){
+    const sx = sh.x, sy = (sh.y ?? mapGroundY);
+    const got = player.abilities[sh.ability];
+    const A = ABILITIES[sh.ability];
+    ctx.save();
+    if(!got){ ctx.globalCompositeOperation = "lighter";
+      const g = ctx.createRadialGradient(sx, sy - 40, 3, sx, sy - 40, 50);
+      g.addColorStop(0, A.col); g.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(sx, sy - 40, 50, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+    ctx.fillStyle = got ? "#3a4155" : "#6b5a45";   // 비석
+    ctx.fillRect(sx - 14, sy - 70, 28, 70);
+    ctx.fillStyle = got ? "#2a303e" : A.col;
+    ctx.fillRect(sx - 9, sy - 62, 18, 30);
+    ctx.textAlign = "center";
+    ctx.font = "bold 11px sans-serif"; ctx.fillStyle = got ? "#4a5568" : A.col;
+    ctx.fillText(got ? "습득 완료" : A.name, sx, sy - 80);
+    if(!got && nearP(sx, sy)){
+      ctx.fillStyle = "rgba(10,12,24,.8)"; roundRect(sx-30, sy-104, 60, 22, 6); ctx.fill();
+      ctx.fillStyle = "#8be9fd"; ctx.font = "bold 13px sans-serif"; ctx.fillText("E 습득", sx, sy - 88);
+    }
+  }
+}
 function drawQuestSpot(spot){
   const x = spot.x, y = mapGroundY - 26 + Math.sin(performance.now()/420) * 5;
   ctx.save();
@@ -3910,6 +4727,9 @@ function drawNPC(n){
     friend:  { robe:"#b74a7a", robeD:"#8a3259", em:"#f9a8d4", mark:"♥" },   // 리나
     friend2: { robe:"#3e6bb0", robeD:"#2c4d85", em:"#93c5fd", mark:"…" },   // 테오
     sailor:  { robe:"#2e5a7a", robeD:"#1f4058", em:"#7dd3fc", mark:"⚓" },
+    forge:   { robe:"#7a4a2e", robeD:"#5a341c", em:"#ff8040", mark:"⚒" },
+    ghost:   { robe:"#5a5a68", robeD:"#3e3e48", em:"#c4b5fd", mark:"…" },
+    master2: { robe:"#3a5578", robeD:"#28405c", em:"#a5f3fc", mark:"❄" },
   }[n.kind] || { robe:"#4a4f7a", robeD:"#353a5e", em:"#c4b5fd", mark:"!" };
   // 몸
   ctx.fillStyle = P2.robe; ctx.fillRect(x - 15, y - 48, 30, 48);
@@ -4289,21 +5109,23 @@ function renderHUD(){
   // 도움말
   if(showHelp){
     ctx.textAlign = "left";
-    ctx.fillStyle = "rgba(10,12,24,.72)";
-    roundRect(16, VIEW_H - 234, 366, 214, 10); ctx.fill();
+    ctx.fillStyle = "rgba(10,12,24,.74)";
+    roundRect(16, VIEW_H - 300, 400, 280, 10); ctx.fill();
     ctx.font = "bold 13px sans-serif"; ctx.fillStyle = "#8be9fd";
-    ctx.fillText("조작법 (H: 접기/펼치기)", 30, VIEW_H - 210);
+    ctx.fillText("조작법 (H: 접기/펼치기)", 30, VIEW_H - 276);
     ctx.font = "13px sans-serif"; ctx.fillStyle = "#cbd5e1";
     const lines = [
-      "← → 이동  /  Space 점프  /  ↓+Space 아래 블럭으로",
-      "Shift 대시(무적)  /  E 대화 · 수업  /  ↑ 포탈 이동",
-      "Z 불티  /  X 홀드 화염구  /  C 화염 장판",
-      "V 랜스  /  S 노바  /  Q(홀드) 인페르노 — 고급 1식",
-      "R 멸화 — 고급 2식 (화면 전체 광역)",
-      "※ 마법은 교수님 수업(E)에서 골라 배워야 사용 가능!",
+      "← → 이동  /  Space 점프(공중 한 번 더=이중점프)",
+      "↓+Space 아래로  /  Shift 대시  /  E 대화·수업·사당·화로",
+      "Z 불티  X 홀드 화염구  C 장판  V 랜스  S 노바",
+      "Q(홀드) 인페르노 — 1식  /  R 멸화 — 2식",
+      "── 이동 술식(세계에서 사당·스승으로 습득) ──",
+      "벽+Space 벽점프  /  F 도깨비불(어둠)  /  G 유성 질주",
+      "낙하 중 Space 유지 = 활공  /  B 섬화(점멸)",
+      "※ 마법은 수업(E), 이동 술식은 탐험(사당)으로!",
       "Tab 학생 수첩  /  M 월드맵  /  자동 저장(F2×2 초기화)",
     ];
-    lines.forEach((l, i)=> ctx.fillText(l, 30, VIEW_H - 186 + i*21));
+    lines.forEach((l, i)=> ctx.fillText(l, 30, VIEW_H - 252 + i*22));
   }else{
     ctx.font = "12px sans-serif"; ctx.fillStyle = "rgba(203,213,225,.5)";
     ctx.fillText("H: 조작법", 20, VIEW_H - 16);
@@ -4311,6 +5133,7 @@ function renderHUD(){
 
   if(showBook) renderBook();
   if(showTrainer) renderTrainer();
+  if(showForge) renderForge();
   if(showWorldMap) renderWorldMap();
   if(learnUI) renderLearn();
 
@@ -4343,7 +5166,7 @@ function renderHUD(){
 
   ctx.textAlign = "right";
   ctx.font = "11px sans-serif"; ctx.fillStyle = "rgba(148,163,184,.55)";
-  ctx.fillText("아르카나 아카데미 프로토타입 v0.15 — 이어진 세계 (치트: YEMO)", VIEW_W - 14, 22);
+  ctx.fillText("아르카나 아카데미 프로토타입 v0.19 — 대륙 확장 (치트: YEMO)", VIEW_W - 14, 22);
   if(saveFlash > 0){
     ctx.globalAlpha = Math.min(1, saveFlash);
     ctx.font = "12px sans-serif"; ctx.fillStyle = "#4ade80";
@@ -4414,17 +5237,34 @@ function renderBook(){
       ctx.closePath(); ctx.fill();
     }
   });
+  // 이동 술식 (세계에서 습득) + 마력 결정
+  ctx.font = "bold 13px sans-serif"; ctx.fillStyle = "#a5f3fc";
+  ctx.fillText("이동 술식", px2 + 28, py + PH - 78);
+  ctx.textAlign = "right";
+  ctx.font = "bold 12px sans-serif"; ctx.fillStyle = "#a5f3fc";
+  ctx.fillText("💎 마력 결정 " + player.crystals + "   ✦ 각인 " + player.charms.equipped.length + "/" + CHARM_SLOTS, px2 + 430, py + PH - 78);
+  ctx.textAlign = "left";
+  ctx.font = "12px sans-serif";
+  let ax = px2 + 28;
+  for(const id of Object.keys(ABILITIES)){
+    const got = player.abilities[id];
+    ctx.fillStyle = got ? ABILITIES[id].col : "#475569";
+    const label = ABILITIES[id].name + (got ? "" : " [미습득]");
+    ctx.fillText(label, ax, py + PH - 58);
+    ax += ctx.measureText(label).width + 14;
+    if(ax > px2 + 380){ ax = px2 + 28; }
+  }
   // 습득한 마법
   ctx.font = "bold 13px sans-serif"; ctx.fillStyle = "#e2e8f0";
-  ctx.fillText("습득한 마법", px2 + 28, py + PH - 55);
-  ctx.font = "12px sans-serif";
-  let sx = px2 + 28;
-  for(const k of ["bolt","fireball","field","lance","nova"]){
+  ctx.fillText("습득한 마법", px2 + 28, py + PH - 34);
+  ctx.font = "11px sans-serif";
+  let sx = px2 + 110;
+  for(const k of SKILL_ORDER){
     const learned = player.skills[k];
     ctx.fillStyle = learned ? "#ffb35c" : "#475569";
-    const label = `${SKILL[k].key} ${SKILL[k].name}` + (learned ? "" : " [미습득]");
+    const label = `${SKILL[k].key}${SKILL[k].name}`;
     ctx.fillText(label, sx, py + PH - 34);
-    sx += ctx.measureText(label).width + 16;
+    sx += ctx.measureText(label).width + 12;
   }
 
   // 우: 퀘스트 일지 (진행 주변 5개)
@@ -4624,6 +5464,44 @@ function renderLearn(){
 }
 
 // ============================== 스킬 강화 패널 (훈련 교관) ==============================
+function renderForge(){
+  const PW = 760, PH = 540, px2 = (VIEW_W-PW)/2, py = (VIEW_H-PH)/2;
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,.6)"; ctx.fillRect(0,0,VIEW_W,VIEW_H);
+  ctx.fillStyle = "rgba(24,16,12,.98)"; roundRect(px2, py, PW, PH, 14); ctx.fill();
+  ctx.strokeStyle = "#7a4a2e"; ctx.lineWidth = 2; roundRect(px2, py, PW, PH, 14); ctx.stroke();
+  ctx.textAlign = "left";
+  ctx.font = "bold 20px sans-serif"; ctx.fillStyle = "#ff8040";
+  ctx.fillText("모루골 각인 공방 — 마도각인", px2 + 28, py + 40);
+  ctx.textAlign = "right";
+  ctx.font = "bold 15px sans-serif"; ctx.fillStyle = "#a5f3fc";
+  ctx.fillText("💎 마력 결정 " + player.crystals, px2 + PW - 28, py + 40);
+  ctx.textAlign = "left";
+  ctx.font = "12px sans-serif"; ctx.fillStyle = "#94a3b8";
+  ctx.fillText(`[1~6] 제작 · Shift+[1~6] 장착/해제 (슬롯 ${player.charms.equipped.length}/${CHARM_SLOTS}) · E/Tab 닫기`, px2 + 28, py + 62);
+  CHARMS.forEach((c, i)=>{
+    const ry = py + 84 + i*70;
+    const owned = player.charms.owned.includes(c.id);
+    const eq = hasCharm(c.id);
+    ctx.fillStyle = eq ? "rgba(255,128,64,.14)" : owned ? "rgba(255,255,255,.04)" : "rgba(0,0,0,.25)";
+    roundRect(px2 + 24, ry - 6, PW - 48, 60, 8); ctx.fill();
+    if(eq){ ctx.strokeStyle = c.col; ctx.lineWidth = 1.5; roundRect(px2 + 24, ry - 6, PW - 48, 60, 8); ctx.stroke(); }
+    ctx.fillStyle = owned ? c.col : "#3a4155";
+    roundRect(px2 + 36, ry + 6, 34, 34, 6); ctx.fill();
+    ctx.textAlign = "center"; ctx.font = "bold 17px sans-serif"; ctx.fillStyle = "#0b0d17";
+    ctx.fillText(String(i+1), px2 + 53, ry + 29);
+    ctx.textAlign = "left";
+    ctx.font = "bold 15px sans-serif"; ctx.fillStyle = owned ? "#e2e8f0" : "#94a3b8";
+    ctx.fillText(c.name + (eq ? "  ✦ 장착 중" : owned ? "  (보유)" : ""), px2 + 86, ry + 16);
+    ctx.font = "12px sans-serif"; ctx.fillStyle = "#94a3b8";
+    ctx.fillText(c.desc, px2 + 86, ry + 36);
+    ctx.textAlign = "right";
+    ctx.font = "bold 13px sans-serif"; ctx.fillStyle = owned ? "#4ade80" : (player.crystals >= c.cost ? "#a5f3fc" : "#f87171");
+    ctx.fillText(owned ? (eq ? "Shift+숫자: 해제" : "숫자: 장착") : ("💎 " + c.cost), px2 + PW - 40, ry + 24);
+    ctx.textAlign = "left";
+  });
+  ctx.restore();
+}
 function renderTrainer(){
   const PW = 740, PH = 588;
   const px2 = (VIEW_W - PW)/2, py = (VIEW_H - PH)/2;
