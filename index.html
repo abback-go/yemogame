@@ -189,7 +189,7 @@ const MAPS = {
       { x: 250,  text: "← → 이동  /  Space 점프  /  Shift 대시" },
       { x: 420,  text: "본관: ↑ 로 들어가 계단을 올라 교실로!" },
       { x: 780,  text: "동아리 별관" },
-      { x: 1180, text: "훈련장 — 배운 마법을 허수아비에!" },
+      { x: 1180, text: "훈련실은 본관 1F에! (본관 ↑)" },
       { x: 1760, text: "마을 가는 길: ↑" },
       { x: 2450, text: "관문: ↑ 입문의 숲" },
     ],
@@ -199,10 +199,8 @@ const MAPS = {
       { x: 1760, y: 640, to: "road1",   tx: 150, ty: 640,  label: "마을 가는 길", tint: "#8be9fd" },
       { x: 2500, y: 640, to: "forest",  tx: 180, ty: 640,  label: "입문의 숲" },
     ],
-    npcs: [
-      { kind: "trainer", name: "훈련 교관", x: 970 },
-    ],
-    mobs: [ ["dummy", 1100], ["dummy", 1190], ["dummy", 1280] ],
+    npcs: [],
+    mobs: [],
   },
 
   school: {
@@ -225,6 +223,7 @@ const MAPS = {
     // 복도의 문들 — 각 시설은 실제 방(별도 맵)
     portals: [
       { x: 140,  y: 1240, to: "campus",     tx: 460, ty: 640,  label: "밖으로", door: true },
+      { x: 520,  y: 1240, to: "trainhall",  tx: 120, ty: 640,  label: "훈련실", door: true, tint: "#f59e0b" },
       { x: 660,  y: 1240, to: "shoproom",   tx: 820, ty: 640,  label: "매점", door: true, tint: "#fbbf24" },
       { x: 900,  y: 1240, to: "infirmary",  tx: 820, ty: 640,  label: "양호실", door: true, tint: "#8be9fd" },
       { x: 1120, y: 1240, to: "basement",   tx: 150, ty: 210,  label: "지하실", tint: "#4ade80", down: true },
@@ -312,6 +311,14 @@ const MAPS = {
       "어서 와요, 매점입니다! 포션·간식·마도서 스크롤…",
       "상점 기능은 준비 중이에요. 조금만 기다려 주세요!" ] } ],
     mobs: [],
+  },
+  trainhall: {
+    name: "본관 1F — 훈련실", w: 1200, theme: "school",
+    platforms: [],
+    signs: [ { x: 300, text: "훈련실 — 배운 마법을 허수아비에 시험!" } ],
+    portals: [ { x: 120, y: 640, to: "school", tx: 520, ty: 1240, label: "복도로", door: true } ],
+    npcs: [ { kind: "trainer", name: "훈련 교관", x: 980 } ],
+    mobs: [ ["dummy", 560], ["dummy", 680], ["dummy", 800] ],
   },
   clubroom: {
     name: "동아리 별관 — 마법 동아리방", w: 1000, theme: "school",
@@ -630,7 +637,7 @@ const TEACHERS = [
         lines:[
           "왔구나, 신입생! 나는 초급 화염술 담당 아그니스다.",
           "마법은 '배워야' 쓸 수 있는 법. 첫 술식 「불티」를 임시 각인해주마.",
-          "Z 키다. 교정 훈련장의 허수아비에 6번 맞혀 보거라!",
+          "Z 키다. 본관 1층 훈련실의 허수아비에 6번 맞혀 보거라!",
         ] },
       { skill:"fireball", name:"화염 응축", task:"maxChargeHit", need:2,
         desc:"MAX 차지 화염구 2회 명중", rewards:[["mag","중"]], exp:30,
@@ -979,7 +986,17 @@ function loadGame(){
     if(d.skills) Object.assign(player.skills, d.skills);
     if(d.skillLv) Object.assign(player.skillLv, d.skillLv);
     if(d.quest) Object.assign(questState, d.quest);
+    // 마이그레이션: 퀘스트가 늘어난 뒤엔 doneAll을 재계산 (구버전 doneAll=true가 신규 체인을 건너뛰던 버그 수정)
+    questState.idx = clamp(questState.idx || 0, 0, QUESTS.length);
+    questState.doneAll = questState.idx >= QUESTS.length;
     if(d.teachers) for(const id in teacherState) if(d.teachers[id]) Object.assign(teacherState[id], d.teachers[id]);
+    // 마이그레이션: 아직 못 배운 스킬의 수업이 '완료' 처리돼 있으면 되돌림
+    for(const t of TEACHERS){
+      const st = teacherState[t.id];
+      for(let i = 0; i < st.idx && i < t.lessons.length; i++){
+        if(!player.skills[t.lessons[i].skill]){ st.idx = i; st.active = false; st.prog = 0; break; }
+      }
+    }
     if(d.bossDefeated) boss.defeated = true;
     combo.best = d.best || 0;
     const mid = MAPS[d.map] ? d.map : "campus";
@@ -2377,7 +2394,7 @@ function renderTitle(){
 
   ctx.font = "12px sans-serif"; ctx.fillStyle = "rgba(148,163,184,.6)";
   ctx.fillText("Enter / Space / 클릭으로 시작", VIEW_W/2, 612);
-  ctx.fillText("프로토타입 v0.10 — 아르카나 아카데미", VIEW_W/2, VIEW_H - 20);
+  ctx.fillText("프로토타입 v0.12 — 아르카나 아카데미", VIEW_W/2, VIEW_H - 20);
   ctx.restore();
 
   if(showOptions) renderOptions();
@@ -3350,7 +3367,7 @@ function renderHUD(){
 
   ctx.textAlign = "right";
   ctx.font = "11px sans-serif"; ctx.fillStyle = "rgba(148,163,184,.55)";
-  ctx.fillText("아르카나 아카데미 프로토타입 v0.11 — 고급 마법", VIEW_W - 14, 22);
+  ctx.fillText("아르카나 아카데미 프로토타입 v0.12 — 실내 훈련실", VIEW_W - 14, 22);
   if(saveFlash > 0){
     ctx.globalAlpha = Math.min(1, saveFlash);
     ctx.font = "12px sans-serif"; ctx.fillStyle = "#4ade80";
@@ -3494,7 +3511,7 @@ function renderCodex(px2, py, PW, PH){
   ctx.font = "bold 15px sans-serif"; ctx.fillStyle = "#e2e8f0";
   ctx.fillText("화염술 스킬 도감", px2 + 28, py + 74);
   ctx.font = "11px sans-serif"; ctx.fillStyle = "#64748b";
-  ctx.fillText("스킬 강화: 교정 훈련장의 훈련 교관 (E)", px2 + PW - 290, py + 74);
+  ctx.fillText("스킬 강화: 본관 1F 훈련실의 훈련 교관 (E)", px2 + PW - 290, py + 74);
 
   SKILL_ORDER.forEach((k, i)=>{
     const S = SKILL[k];
